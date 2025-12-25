@@ -749,10 +749,11 @@ export const useAppData = () => {
   }, [isSupabaseEnabled]);
 
   useEffect(() => {
-    if (!isSupabaseEnabled || !supabase) return;
+    const client = supabase;
+    if (!isSupabaseEnabled || !client) return;
 
     const loadClans = async () => {
-      const { data: clanRows } = await supabase
+      const { data: clanRows } = await client
         .from("clans")
         .select("id, name, slug, description, is_public");
       if (clanRows && clanRows.length > 0) {
@@ -771,36 +772,37 @@ export const useAppData = () => {
   }, [isSupabaseEnabled]);
 
   useEffect(() => {
-    if (!isSupabaseEnabled || !supabase || !activeClanId) return;
+    const client = supabase;
+    if (!isSupabaseEnabled || !client || !activeClanId) return;
 
     const loadClanData = async () => {
-      const { data: personRows } = await supabase
+      const { data: personRows } = await client
         .from("persons")
         .select("*")
         .eq("clan_id", activeClanId);
       setPersons((personRows ?? []).map(mapPersonRow));
 
-      const { data: relationshipRows } = await supabase
+      const { data: relationshipRows } = await client
         .from("relationships")
         .select("*")
         .eq("clan_id", activeClanId);
       setRelationships((relationshipRows ?? []).map(mapRelationshipRow));
 
-      const { data: positionRows } = await supabase
+      const { data: positionRows } = await client
         .from("person_positions")
         .select("*")
         .eq("clan_id", activeClanId);
       setPositions((positionRows ?? []).map(mapPositionRow));
 
       if (!isGuest) {
-        const { data: suggestionRows } = await supabase
+        const { data: suggestionRows } = await client
           .from("suggestions")
           .select("*")
           .eq("clan_id", activeClanId)
           .order("created_at", { ascending: false });
         setSuggestions((suggestionRows ?? []).map(mapSuggestionRow));
 
-        const { data: eventRows } = await supabase
+        const { data: eventRows } = await client
           .from("change_events")
           .select("*")
           .eq("clan_id", activeClanId)
