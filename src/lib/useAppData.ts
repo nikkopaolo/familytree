@@ -195,6 +195,36 @@ export const useAppData = () => {
     await supabase.auth.signOut();
   };
 
+  const bootstrapAdmin = async () => {
+    if (!supabase) return;
+    const { data: sessionData } = await supabase.auth.getSession();
+    const token = sessionData.session?.access_token;
+    if (!token) return;
+    await fetch("/api/admin/bootstrap", {
+      method: "POST",
+      headers: { Authorization: `Bearer ${token}` },
+    });
+  };
+
+  const inviteAdmin = async (email: string, clanId: string) => {
+    if (!supabase) return { error: "Supabase not configured." };
+    const { data: sessionData } = await supabase.auth.getSession();
+    const token = sessionData.session?.access_token;
+    if (!token) return { error: "Not signed in." };
+    const response = await fetch("/api/admin/invite", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${token}`,
+      },
+      body: JSON.stringify({ email, clanId }),
+    });
+    const payload = await response.json();
+    if (!response.ok) {
+      return { error: payload.error ?? "Invite failed." };
+    }
+    return { error: "" };
+  };
   const createSuggestion = async (input: CreateSuggestionInput) => {
     const normalizedPayload = normalizePersonPayload(input.payload);
     const suggestion: Suggestion = {
@@ -742,6 +772,8 @@ export const useAppData = () => {
         });
         setIsGuest(false);
 
+        await bootstrapAdmin();
+
         const { data: membershipsRows } = await client
           .from("clan_memberships")
           .select("clan_id, role")
@@ -872,6 +904,7 @@ export const useAppData = () => {
     canEditPerson,
     signInWithEmail,
     signOut,
+    inviteAdmin,
     createSuggestion,
     approveSuggestion,
     rejectSuggestion,

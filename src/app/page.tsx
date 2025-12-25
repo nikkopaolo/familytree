@@ -47,6 +47,7 @@ export default function Home() {
     createPerson,
     createParentChildRelationship,
     createPartnerRelationship,
+    inviteAdmin,
   } = useAppData();
 
   const [activeTab, setActiveTab] = useState<AppTab>("tree");
@@ -116,6 +117,16 @@ export default function Home() {
         }}
         role={membership?.role}
         user={currentUser}
+        onInviteAdmin={async () => {
+          const email = window.prompt("Invite admin by email");
+          if (!email) return;
+          const result = await inviteAdmin(email, activeClanId);
+          if (result.error) {
+            window.alert(result.error);
+            return;
+          }
+          window.alert("Admin invite sent.");
+        }}
         onAddMember={() => {
           createPerson({ fullName: "New Member" });
         }}

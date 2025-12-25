@@ -27,6 +27,8 @@ Open `http://localhost:3000`.
 NEXT_PUBLIC_SUPABASE_URL=your-project-url
 NEXT_PUBLIC_SUPABASE_ANON_KEY=your-anon-key
 SUPABASE_SERVICE_ROLE_KEY=your-service-role-key
+SUPER_ADMIN_EMAILS=katigbaknikkopaolo@gmail.com
+NEXT_PUBLIC_SITE_URL=https://familytree-4x64.vercel.app
 ```
 
 If env vars are missing, the app falls back to mock data for UI review.
@@ -42,6 +44,9 @@ If env vars are missing, the app falls back to mock data for UI review.
 - Branch owners can edit members in their assigned branch (based on `branch_root_id`).
 - Guests can only submit suggestions and cannot approve.
 - Clans can be public (`is_public = true`) for guest read access.
+
+## Admin Bootstrap
+When a signed-in user's email matches `SUPER_ADMIN_EMAILS`, the app auto-assigns admin membership for all clans using the server-side service role key.
 
 ## Import / Export
 - CSV: exports and imports a flat list of people (no relationships).

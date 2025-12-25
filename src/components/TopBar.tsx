@@ -10,6 +10,7 @@ type TopBarProps = {
   role?: MembershipRole;
   user: UserProfile;
   onAddMember?: () => void;
+  onInviteAdmin?: () => void;
 };
 
 const roleLabel = (role?: MembershipRole) => {
@@ -24,6 +25,7 @@ export const TopBar = ({
   role,
   user,
   onAddMember,
+  onInviteAdmin,
 }: TopBarProps) => {
   return (
     <header className="glass-card sticky top-4 z-20 mx-auto mt-4 flex w-[min(1200px,94vw)] flex-col gap-4 rounded-3xl px-6 py-5 md:flex-row md:items-center md:justify-between">
@@ -68,9 +70,13 @@ export const TopBar = ({
             <div className="text-xs text-slate-500">{user.email ?? "Guest access"}</div>
           </div>
         </div>
-        <button className="inline-flex items-center gap-2 rounded-2xl border border-slate-200 bg-white px-4 py-2 text-sm font-semibold text-slate-700 shadow-sm transition hover:border-amber-300 hover:text-amber-700">
+        <button
+          className="inline-flex items-center gap-2 rounded-2xl border border-slate-200 bg-white px-4 py-2 text-sm font-semibold text-slate-700 shadow-sm transition hover:border-amber-300 hover:text-amber-700"
+          onClick={onInviteAdmin}
+          type="button"
+        >
           <UserPlus2 size={16} />
-          Invite
+          Invite Admin
         </button>
         <button
           className="inline-flex items-center gap-2 rounded-2xl bg-amber-500 px-4 py-2 text-sm font-semibold text-white shadow-lg shadow-amber-200 transition hover:bg-amber-600"
