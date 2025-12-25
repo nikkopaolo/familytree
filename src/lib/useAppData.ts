@@ -694,10 +694,11 @@ export const useAppData = () => {
   };
 
   useEffect(() => {
-    if (!isSupabaseEnabled || !supabase) return;
+    const client = supabase;
+    if (!isSupabaseEnabled || !client) return;
 
     const loadSession = async () => {
-      const { data: userData } = await supabase.auth.getUser();
+      const { data: userData } = await client.auth.getUser();
       const user = userData.user;
       if (!user) {
         setCurrentUser(guestProfile);
@@ -712,7 +713,7 @@ export const useAppData = () => {
         });
         setIsGuest(false);
 
-        const { data: membershipsRows } = await supabase
+        const { data: membershipsRows } = await client
           .from("clan_memberships")
           .select("clan_id, role")
           .eq("user_id", user.id);
@@ -723,7 +724,7 @@ export const useAppData = () => {
           }))
         );
 
-        const { data: ownersRows } = await supabase
+        const { data: ownersRows } = await client
           .from("branch_owners")
           .select("clan_id, branch_root_id")
           .eq("user_id", user.id);
@@ -738,7 +739,7 @@ export const useAppData = () => {
 
     loadSession();
 
-    const { data: listener } = supabase.auth.onAuthStateChange(() => {
+    const { data: listener } = client.auth.onAuthStateChange(() => {
       loadSession();
     });
 
