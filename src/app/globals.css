@@ -1,0 +1,66 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  color-scheme: light;
+  --ink: #1f2933;
+  --slate: #334155;
+  --mist: #f3f0ea;
+  --paper: #fbf7f0;
+  --river: #1f6f8b;
+  --leaf: #2f6f4e;
+  --sun: #f1b34c;
+  --ember: #e76f51;
+  --glow: rgba(241, 179, 76, 0.35);
+  --card: rgba(255, 255, 255, 0.75);
+  --stroke: rgba(31, 41, 51, 0.12);
+}
+
+body {
+  font-family: var(--font-body), system-ui, sans-serif;
+  color: var(--ink);
+  background:
+    radial-gradient(1200px 600px at 15% -5%, rgba(241, 179, 76, 0.35), transparent 60%),
+    radial-gradient(900px 500px at 85% 10%, rgba(31, 111, 139, 0.25), transparent 55%),
+    linear-gradient(180deg, #f7f1e6 0%, #fbf7f0 35%, #f6efe4 100%);
+  min-height: 100vh;
+}
+
+h1,
+h2,
+h3,
+h4 {
+  font-family: var(--font-heading), serif;
+  letter-spacing: 0.01em;
+}
+
+.glass-card {
+  background: var(--card);
+  border: 1px solid var(--stroke);
+  box-shadow: 0 24px 60px rgba(31, 41, 51, 0.12);
+  backdrop-filter: blur(18px);
+}
+
+.surface-card {
+  background: #fffaf1;
+  border: 1px solid rgba(31, 41, 51, 0.08);
+  box-shadow: 0 16px 32px rgba(31, 41, 51, 0.08);
+}
+
+.chip {
+  border: 1px solid rgba(31, 41, 51, 0.2);
+  background: rgba(255, 255, 255, 0.8);
+}
+
+.graph-grid {
+  background-image: radial-gradient(rgba(31, 41, 51, 0.08) 1px, transparent 1px);
+  background-size: 22px 22px;
+}
+
+.react-flow__node-person {
+  border-radius: 16px;
+  border: 1px solid rgba(31, 41, 51, 0.2);
+  box-shadow: 0 10px 24px rgba(31, 41, 51, 0.12);
+  background: #fffaf1;
+}
