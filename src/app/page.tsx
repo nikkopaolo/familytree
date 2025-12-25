@@ -46,6 +46,7 @@ export default function Home() {
     importTreeJson,
     createPerson,
     createParentChildRelationship,
+    createPartnerRelationship,
   } = useAppData();
 
   const [activeTab, setActiveTab] = useState<AppTab>("tree");
@@ -187,6 +188,7 @@ export default function Home() {
             canEdit={selectedPerson ? canEditPerson(selectedPerson) : false}
             onSubmitUpdate={handleSubmitUpdate}
             onAddParentChild={(parentId, childId) => createParentChildRelationship(parentId, childId)}
+            onAddPartner={(personId, partnerId) => createPartnerRelationship(personId, partnerId)}
             canUploadPhoto={Boolean(selectedPerson && canEditPerson(selectedPerson) && isSupabaseEnabled && !isGuest)}
             onUploadPhoto={
               selectedPerson

@@ -13,6 +13,7 @@ type PersonDetailsProps = {
   canEdit: boolean;
   onSubmitUpdate: (payload: Record<string, unknown>, email?: string) => void;
   onAddParentChild: (parentId: string, childId: string) => void;
+  onAddPartner: (personId: string, partnerId: string) => void;
   canUploadPhoto?: boolean;
   onUploadPhoto?: (file: File) => Promise<{ error?: string }>;
 };
@@ -24,6 +25,7 @@ export const PersonDetails = ({
   canEdit,
   onSubmitUpdate,
   onAddParentChild,
+  onAddPartner,
   canUploadPhoto = false,
   onUploadPhoto,
 }: PersonDetailsProps) => {
@@ -32,6 +34,7 @@ export const PersonDetails = ({
   const [photoMessage, setPhotoMessage] = useState("");
   const [selectedParentId, setSelectedParentId] = useState("");
   const [selectedChildId, setSelectedChildId] = useState("");
+  const [selectedPartnerId, setSelectedPartnerId] = useState("");
   const [formState, setFormState] = useState({
     fullName: "",
     isAlive: true,
@@ -46,13 +49,27 @@ export const PersonDetails = ({
       return {
         parents: [] as Person[],
         children: [] as Person[],
+        partners: [] as Person[],
+        siblings: [] as Person[],
+        auntsUncles: [] as Person[],
+        niecesNephews: [] as Person[],
         eligibleParents: [] as Person[],
         eligibleChildren: [] as Person[],
+        eligiblePartners: [] as Person[],
       };
     }
 
-    const parentLinks = relationships.filter((rel) => rel.childId === personId);
-    const childLinks = relationships.filter((rel) => rel.parentId === personId);
+    const parentLinks = relationships.filter(
+      (rel) => rel.relationshipType === "parent" && rel.childId === personId
+    );
+    const childLinks = relationships.filter(
+      (rel) => rel.relationshipType === "parent" && rel.parentId === personId
+    );
+    const partnerLinks = relationships.filter(
+      (rel) =>
+        rel.relationshipType === "partner" &&
+        (rel.parentId === personId || rel.childId === personId)
+    );
 
     const parents = parentLinks
       .map((rel) => persons.find((p) => p.id === rel.parentId))
@@ -60,9 +77,17 @@ export const PersonDetails = ({
     const children = childLinks
       .map((rel) => persons.find((p) => p.id === rel.childId))
       .filter(Boolean) as Person[];
+    const partners = partnerLinks
+      .map((rel) =>
+        persons.find((p) => p.id === (rel.parentId === personId ? rel.childId : rel.parentId))
+      )
+      .filter(Boolean) as Person[];
 
     const parentIdSet = new Set(parentLinks.map((rel) => rel.parentId));
     const childIdSet = new Set(childLinks.map((rel) => rel.childId));
+    const partnerIdSet = new Set(
+      partnerLinks.map((rel) => (rel.parentId === personId ? rel.childId : rel.parentId))
+    );
 
     const eligibleParents = persons.filter(
       (p) => p.id !== personId && !parentIdSet.has(p.id)
@@ -70,8 +95,68 @@ export const PersonDetails = ({
     const eligibleChildren = persons.filter(
       (p) => p.id !== personId && !childIdSet.has(p.id)
     );
+    const eligiblePartners = persons.filter(
+      (p) => p.id !== personId && !partnerIdSet.has(p.id)
+    );
 
-    return { parents, children, eligibleParents, eligibleChildren };
+    const siblingIds = new Set(
+      relationships
+        .filter(
+          (rel) => rel.relationshipType === "parent" && parentIdSet.has(rel.parentId)
+        )
+        .map((rel) => rel.childId)
+    );
+    siblingIds.delete(personId);
+
+    const siblings = Array.from(siblingIds)
+      .map((id) => persons.find((p) => p.id === id))
+      .filter(Boolean) as Person[];
+
+    const grandparentIds = new Set(
+      relationships
+        .filter(
+          (rel) => rel.relationshipType === "parent" && parentIdSet.has(rel.childId)
+        )
+        .map((rel) => rel.parentId)
+    );
+
+    const auntUncleIds = new Set(
+      relationships
+        .filter(
+          (rel) => rel.relationshipType === "parent" && grandparentIds.has(rel.parentId)
+        )
+        .map((rel) => rel.childId)
+    );
+    parentIdSet.forEach((id) => auntUncleIds.delete(id));
+    auntUncleIds.delete(personId);
+
+    const auntsUncles = Array.from(auntUncleIds)
+      .map((id) => persons.find((p) => p.id === id))
+      .filter(Boolean) as Person[];
+
+    const nieceNephewIds = new Set(
+      relationships
+        .filter(
+          (rel) => rel.relationshipType === "parent" && siblingIds.has(rel.parentId)
+        )
+        .map((rel) => rel.childId)
+    );
+
+    const niecesNephews = Array.from(nieceNephewIds)
+      .map((id) => persons.find((p) => p.id === id))
+      .filter(Boolean) as Person[];
+
+    return {
+      parents,
+      children,
+      partners,
+      siblings,
+      auntsUncles,
+      niecesNephews,
+      eligibleParents,
+      eligibleChildren,
+      eligiblePartners,
+    };
   }, [personId, persons, relationships]);
 
   useEffect(() => {
@@ -130,6 +215,12 @@ export const PersonDetails = ({
     if (!selectedChildId) return;
     onAddParentChild(personId, selectedChildId);
     setSelectedChildId("");
+  };
+
+  const addPartner = () => {
+    if (!selectedPartnerId) return;
+    onAddPartner(personId, selectedPartnerId);
+    setSelectedPartnerId("");
   };
 
   return (
@@ -217,6 +308,46 @@ export const PersonDetails = ({
         </p>
         <div className="mt-3 space-y-3 text-sm text-slate-700">
           <div>
+            <span className="text-xs font-semibold text-slate-500">Partners</span>
+            <div className="mt-1">
+              {relationshipSummary.partners.length > 0 ? (
+                <ul className="space-y-1 text-sm">
+                  {relationshipSummary.partners.map((partner) => (
+                    <li key={partner.id} className="text-slate-700">
+                      {partner.fullName}
+                    </li>
+                  ))}
+                </ul>
+              ) : (
+                <p className="text-sm text-slate-500">No partners linked yet.</p>
+              )}
+            </div>
+            <div className="mt-2 flex gap-2">
+              <select
+                className="w-full rounded-xl border border-slate-200 px-3 py-2 text-sm"
+                value={selectedPartnerId}
+                onChange={(event) => setSelectedPartnerId(event.target.value)}
+                disabled={!canEdit}
+              >
+                <option value="">Add partner</option>
+                {relationshipSummary.eligiblePartners.map((candidate) => (
+                  <option key={candidate.id} value={candidate.id}>
+                    {candidate.fullName}
+                  </option>
+                ))}
+              </select>
+              <button
+                className="rounded-xl bg-slate-900 px-3 py-2 text-xs font-semibold text-white disabled:opacity-40"
+                onClick={addPartner}
+                disabled={!selectedPartnerId || !canEdit}
+                type="button"
+              >
+                Link
+              </button>
+            </div>
+          </div>
+
+          <div>
             <span className="text-xs font-semibold text-slate-500">Parents</span>
             <div className="mt-1">
               {relationshipSummary.parents.length > 0 ? (
@@ -293,6 +424,41 @@ export const PersonDetails = ({
               >
                 Link
               </button>
+            </div>
+          </div>
+          <div className="border-t border-slate-100 pt-3">
+            <span className="text-xs font-semibold text-slate-500">Derived</span>
+            <div className="mt-2 space-y-2 text-sm text-slate-600">
+              <div>
+                <span className="text-xs font-semibold text-slate-500">Siblings</span>
+                {relationshipSummary.siblings.length > 0 ? (
+                  <p className="mt-1 text-sm text-slate-700">
+                    {relationshipSummary.siblings.map((item) => item.fullName).join(", ")}
+                  </p>
+                ) : (
+                  <p className="mt-1 text-sm text-slate-500">No siblings detected.</p>
+                )}
+              </div>
+              <div>
+                <span className="text-xs font-semibold text-slate-500">Aunts / Uncles</span>
+                {relationshipSummary.auntsUncles.length > 0 ? (
+                  <p className="mt-1 text-sm text-slate-700">
+                    {relationshipSummary.auntsUncles.map((item) => item.fullName).join(", ")}
+                  </p>
+                ) : (
+                  <p className="mt-1 text-sm text-slate-500">No aunts or uncles detected.</p>
+                )}
+              </div>
+              <div>
+                <span className="text-xs font-semibold text-slate-500">Nieces / Nephews</span>
+                {relationshipSummary.niecesNephews.length > 0 ? (
+                  <p className="mt-1 text-sm text-slate-700">
+                    {relationshipSummary.niecesNephews.map((item) => item.fullName).join(", ")}
+                  </p>
+                ) : (
+                  <p className="mt-1 text-sm text-slate-500">No nieces or nephews detected.</p>
+                )}
+              </div>
             </div>
           </div>
         </div>

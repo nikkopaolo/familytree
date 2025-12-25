@@ -381,17 +381,27 @@ export const useAppData = () => {
     return nextPerson;
   };
 
-  const createParentChildRelationship = async (parentId: string, childId: string) => {
-    if (!parentId || !childId || parentId === childId) {
+  const createRelationship = async (
+    personAId: string,
+    personBId: string,
+    relationshipType: "parent" | "partner"
+  ) => {
+    if (!personAId || !personBId || personAId === personBId) {
       return undefined;
     }
 
-    const existing = relationships.find(
-      (rel) =>
-        rel.clanId === activeClanId &&
-        rel.parentId === parentId &&
-        rel.childId === childId
-    );
+    const isPartner = relationshipType === "partner";
+    const existing = relationships.find((rel) => {
+      if (rel.clanId !== activeClanId) return false;
+      if (rel.relationshipType !== relationshipType) return false;
+      const directMatch = rel.parentId === personAId && rel.childId === personBId;
+      if (directMatch) return true;
+      if (isPartner) {
+        return rel.parentId === personBId && rel.childId === personAId;
+      }
+      return false;
+    });
+
     if (existing) {
       return existing;
     }
@@ -399,17 +409,23 @@ export const useAppData = () => {
     const relationship: Relationship = {
       id: crypto.randomUUID(),
       clanId: activeClanId,
-      parentId,
-      childId,
-      relationshipType: "parent",
+      parentId: personAId,
+      childId: personBId,
+      relationshipType,
     };
 
-    const changeDiff = [
-      { field: "parent", before: "-", after: parentId },
-      { field: "child", before: "-", after: childId },
-    ];
+    const changeDiff = isPartner
+      ? [
+          { field: "partnerA", before: "-", after: personAId },
+          { field: "partnerB", before: "-", after: personBId },
+        ]
+      : [
+          { field: "parent", before: "-", after: personAId },
+          { field: "child", before: "-", after: personBId },
+        ];
 
-    if (!isSupabaseEnabled || !supabase) {
+    const client = supabase;
+    if (!isSupabaseEnabled || !client) {
       setRelationships((prev) => [relationship, ...prev]);
       setChangeEvents((prev) => [
         {
@@ -428,14 +444,14 @@ export const useAppData = () => {
       return relationship;
     }
 
-    const { data: inserted } = await supabase
+    const { data: inserted } = await client
       .from("relationships")
       .insert({
         id: relationship.id,
         clan_id: activeClanId,
-        parent_id: parentId,
-        child_id: childId,
-        relationship_type: "parent",
+        parent_id: personAId,
+        child_id: personBId,
+        relationship_type: relationshipType,
       })
       .select()
       .single();
@@ -443,7 +459,7 @@ export const useAppData = () => {
     const nextRel = inserted ? mapRelationshipRow(inserted) : relationship;
     setRelationships((prev) => [nextRel, ...prev]);
 
-    await supabase.from("change_events").insert({
+    await client.from("change_events").insert({
       clan_id: activeClanId,
       actor_id: currentUser.id,
       actor_name: currentUser.name,
@@ -470,6 +486,12 @@ export const useAppData = () => {
 
     return nextRel;
   };
+
+  const createParentChildRelationship = async (parentId: string, childId: string) =>
+    createRelationship(parentId, childId, "parent");
+
+  const createPartnerRelationship = async (personId: string, partnerId: string) =>
+    createRelationship(personId, partnerId, "partner");
 
   const approveSuggestion = async (suggestionId: string) => {
     const suggestion = suggestions.find((item) => item.id === suggestionId);
@@ -849,6 +871,7 @@ export const useAppData = () => {
     applyPersonUpdate,
     createPerson,
     createParentChildRelationship,
+    createPartnerRelationship,
     uploadPersonPhoto,
     importPeople,
     importTreeJson,

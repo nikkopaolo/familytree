@@ -39,7 +39,7 @@ export type Relationship = {
   clanId: string;
   parentId: string;
   childId: string;
-  relationshipType: "parent";
+  relationshipType: "parent" | "partner";
 };
 
 export type PersonPosition = {

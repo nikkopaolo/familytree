@@ -24,12 +24,14 @@ export const filterTree = (
   const personMap = new Map(persons.map((person) => [person.id, person]));
   const adjacency = new Map<string, string[]>();
 
-  relationships.forEach((rel) => {
-    if (!adjacency.has(rel.parentId)) adjacency.set(rel.parentId, []);
-    if (!adjacency.has(rel.childId)) adjacency.set(rel.childId, []);
-    adjacency.get(rel.parentId)?.push(rel.childId);
-    adjacency.get(rel.childId)?.push(rel.parentId);
-  });
+  relationships
+    .filter((rel) => rel.relationshipType === "parent")
+    .forEach((rel) => {
+      if (!adjacency.has(rel.parentId)) adjacency.set(rel.parentId, []);
+      if (!adjacency.has(rel.childId)) adjacency.set(rel.childId, []);
+      adjacency.get(rel.parentId)?.push(rel.childId);
+      adjacency.get(rel.childId)?.push(rel.parentId);
+    });
 
   const selected = new Set<string>();
   const queue: Array<{ id: string; depth: number }> = [
@@ -53,7 +55,10 @@ export const filterTree = (
 
   const filteredPersons = persons.filter((person) => selected.has(person.id));
   const filteredRelationships = relationships.filter(
-    (rel) => selected.has(rel.parentId) && selected.has(rel.childId)
+    (rel) =>
+      rel.relationshipType === "parent" &&
+      selected.has(rel.parentId) &&
+      selected.has(rel.childId)
   );
 
   return { filteredPersons, filteredRelationships };
@@ -80,9 +85,11 @@ export const buildTreeGraph = ({
     graph.setNode(person.id, { width: NODE_WIDTH, height: NODE_HEIGHT });
   });
 
-  relationships.forEach((rel) => {
-    graph.setEdge(rel.parentId, rel.childId);
-  });
+  relationships
+    .filter((rel) => rel.relationshipType === "parent")
+    .forEach((rel) => {
+      graph.setEdge(rel.parentId, rel.childId);
+    });
 
   dagre.layout(graph);
 
@@ -106,14 +113,16 @@ export const buildTreeGraph = ({
     };
   });
 
-  const edges: Edge[] = relationships.map((rel) => ({
-    id: rel.id,
-    source: rel.parentId,
-    target: rel.childId,
-    type: "smoothstep",
-    animated: false,
-    style: { stroke: "rgba(31, 41, 51, 0.5)", strokeWidth: 2 },
-  }));
+  const edges: Edge[] = relationships
+    .filter((rel) => rel.relationshipType === "parent")
+    .map((rel) => ({
+      id: rel.id,
+      source: rel.parentId,
+      target: rel.childId,
+      type: "smoothstep",
+      animated: false,
+      style: { stroke: "rgba(31, 41, 51, 0.5)", strokeWidth: 2 },
+    }));
 
   return { nodes, edges };
 };
