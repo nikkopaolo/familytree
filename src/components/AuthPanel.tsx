@@ -10,6 +10,7 @@ type AuthPanelProps = {
   currentUser: UserProfile;
   onSignIn: (email: string) => Promise<{ error?: string }>;
   onSignOut: () => Promise<void>;
+  adminBootstrapError?: string;
 };
 
 export const AuthPanel = ({
@@ -18,6 +19,7 @@ export const AuthPanel = ({
   currentUser,
   onSignIn,
   onSignOut,
+  adminBootstrapError,
 }: AuthPanelProps) => {
   const [email, setEmail] = useState("");
   const [message, setMessage] = useState("");
@@ -95,6 +97,9 @@ export const AuthPanel = ({
           </div>
         )}
         {message && <p className="text-xs text-slate-500">{message}</p>}
+        {adminBootstrapError && (
+          <p className="text-xs text-rose-600">{adminBootstrapError}</p>
+        )}
       </div>
     </aside>
   );

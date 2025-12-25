@@ -48,6 +48,7 @@ export default function Home() {
     createParentChildRelationship,
     createPartnerRelationship,
     inviteAdmin,
+    adminBootstrapError,
   } = useAppData();
 
   const [activeTab, setActiveTab] = useState<AppTab>("tree");
@@ -206,6 +207,7 @@ export default function Home() {
             currentUser={currentUser}
             onSignIn={signInWithEmail}
             onSignOut={signOut}
+            adminBootstrapError={adminBootstrapError}
           />
           <PersonDetails
             person={selectedPerson}

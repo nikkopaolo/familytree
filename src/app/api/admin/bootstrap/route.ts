@@ -40,7 +40,32 @@ export async function POST(request: Request) {
     return NextResponse.json({ ok: true, promoted: false });
   }
 
-  const { data: clans } = await adminClient.from("clans").select("id");
+  let { data: clans } = await adminClient.from("clans").select("id");
+  if (!clans || clans.length === 0) {
+    const baseSlug = "my-family";
+    const insertClan = async (slug: string) =>
+      adminClient
+        .from("clans")
+        .insert({
+          name: "My Family",
+          slug,
+          description: "Primary clan",
+          created_by: user.id,
+          is_public: true,
+        })
+        .select("id")
+        .single();
+
+    const { data: created, error } = await insertClan(baseSlug);
+    if (!created && error) {
+      const suffix = Date.now().toString(36);
+      await insertClan(`${baseSlug}-${suffix}`);
+    }
+
+    const refreshed = await adminClient.from("clans").select("id");
+    clans = refreshed.data ?? [];
+  }
+
   if (!clans || clans.length === 0) {
     return NextResponse.json({ ok: true, promoted: false, reason: "no_clans" });
   }

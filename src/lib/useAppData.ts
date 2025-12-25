@@ -133,6 +133,8 @@ export const useAppData = () => {
   const [branchOwners, setBranchOwners] = useState<BranchOwner[]>([]);
   const [manualPositions, setManualPositions] = useState<Record<string, { x: number; y: number }>>({});
   const [selectedPersonId, setSelectedPersonId] = useState<string>("");
+  const [clansVersion, setClansVersion] = useState(0);
+  const [adminBootstrapError, setAdminBootstrapError] = useState("");
 
   const isSupabaseEnabled = Boolean(isSupabaseConfigured && supabase);
 
@@ -200,10 +202,19 @@ export const useAppData = () => {
     const { data: sessionData } = await supabase.auth.getSession();
     const token = sessionData.session?.access_token;
     if (!token) return;
-    await fetch("/api/admin/bootstrap", {
+    const response = await fetch("/api/admin/bootstrap", {
       method: "POST",
       headers: { Authorization: `Bearer ${token}` },
     });
+    const payload = await response.json().catch(() => ({}));
+    if (!response.ok) {
+      setAdminBootstrapError(payload.error ?? "Admin bootstrap failed.");
+      return;
+    }
+    setAdminBootstrapError("");
+    if (payload.promoted) {
+      setClansVersion((prev) => prev + 1);
+    }
   };
 
   const inviteAdmin = async (email: string, clanId: string) => {
@@ -807,7 +818,7 @@ export const useAppData = () => {
     return () => {
       listener.subscription.unsubscribe();
     };
-  }, [isSupabaseEnabled]);
+  }, [isSupabaseEnabled, clansVersion]);
 
   useEffect(() => {
     const client = supabase;
@@ -922,5 +933,6 @@ export const useAppData = () => {
     persons,
     relationships,
     positions,
+    adminBootstrapError,
   };
 };
