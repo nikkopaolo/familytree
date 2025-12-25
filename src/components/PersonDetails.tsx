@@ -46,30 +46,30 @@ export const PersonDetails = ({
 
   const relationshipSummary = useMemo(() => {
     if (!personId) {
-      return {
-        parents: [] as Person[],
-        children: [] as Person[],
-        partners: [] as Person[],
-        siblings: [] as Person[],
-        auntsUncles: [] as Person[],
-        niecesNephews: [] as Person[],
-        eligibleParents: [] as Person[],
-        eligibleChildren: [] as Person[],
-        eligiblePartners: [] as Person[],
-      };
-    }
+    return {
+      parents: [] as Person[],
+      children: [] as Person[],
+      partners: [] as Person[],
+      siblings: [] as Person[],
+      auntsUncles: [] as Person[],
+      niecesNephews: [] as Person[],
+      eligibleParents: [] as Person[],
+      eligibleChildren: [] as Person[],
+      eligiblePartners: [] as Person[],
+    };
+  }
 
-    const parentLinks = relationships.filter(
-      (rel) => rel.relationshipType === "parent" && rel.childId === personId
-    );
-    const childLinks = relationships.filter(
-      (rel) => rel.relationshipType === "parent" && rel.parentId === personId
-    );
-    const partnerLinks = relationships.filter(
-      (rel) =>
-        rel.relationshipType === "partner" &&
-        (rel.parentId === personId || rel.childId === personId)
-    );
+  const parentLinks = relationships.filter(
+    (rel) => rel.relationshipType === "parent" && rel.childId === personId
+  );
+  const childLinks = relationships.filter(
+    (rel) => rel.relationshipType === "parent" && rel.parentId === personId
+  );
+  const partnerLinks = relationships.filter(
+    (rel) =>
+      rel.relationshipType === "partner" &&
+      (rel.parentId === personId || rel.childId === personId)
+  );
 
     const parents = parentLinks
       .map((rel) => persons.find((p) => p.id === rel.parentId))

@@ -139,6 +139,21 @@ export default function Home() {
               relationships={clanRelationships}
               positions={clanPositions}
               manualPositions={manualPositions}
+              canEditPerson={canEditPerson}
+              onAddChild={async (parentId) => {
+                const newPerson = await createPerson({ fullName: "New Member" });
+                if (newPerson) {
+                  await createParentChildRelationship(parentId, newPerson.id);
+                  setSelectedPersonId(newPerson.id);
+                }
+              }}
+              onAddPartner={async (personId) => {
+                const newPerson = await createPerson({ fullName: "New Member" });
+                if (newPerson) {
+                  await createPartnerRelationship(personId, newPerson.id);
+                  setSelectedPersonId(newPerson.id);
+                }
+              }}
               onUpdatePosition={updateManualPosition}
               selectedPersonId={selectedPersonId}
               onSelectPerson={setSelectedPersonId}

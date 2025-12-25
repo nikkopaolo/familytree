@@ -12,6 +12,9 @@ type TreeCanvasProps = {
   relationships: Relationship[];
   positions: PersonPosition[];
   manualPositions: Record<string, { x: number; y: number }>;
+  canEditPerson: (person: Person) => boolean;
+  onAddChild: (parentId: string) => void;
+  onAddPartner: (personId: string) => void;
   onUpdatePosition: (id: string, x: number, y: number) => void;
   selectedPersonId: string;
   onSelectPerson: (id: string) => void;
@@ -30,6 +33,9 @@ export const TreeCanvas = ({
   relationships,
   positions,
   manualPositions,
+  canEditPerson,
+  onAddChild,
+  onAddPartner,
   onUpdatePosition,
   selectedPersonId,
   onSelectPerson,
@@ -74,6 +80,21 @@ export const TreeCanvas = ({
       selected: selected.has(node.id),
     })) as Node[];
   }, [nodes, selectedPersonId]);
+
+  const interactiveNodes = useMemo(() => {
+    return nodeHighlight.map((node) => {
+      const person = node.data as Person;
+      return {
+        ...node,
+        data: {
+          person,
+          canEdit: canEditPerson(person),
+          onAddChild: () => onAddChild(person.id),
+          onAddPartner: () => onAddPartner(person.id),
+        },
+      };
+    });
+  }, [nodeHighlight, canEditPerson, onAddChild, onAddPartner]);
 
   if (!hasPeople) {
     return (
@@ -178,7 +199,7 @@ export const TreeCanvas = ({
       </div>
       <div className="graph-grid relative h-full w-full overflow-hidden rounded-3xl border border-slate-200 bg-white/70">
         <ReactFlow
-          nodes={nodeHighlight}
+          nodes={interactiveNodes}
           edges={edges}
           nodeTypes={nodeTypes}
           fitView

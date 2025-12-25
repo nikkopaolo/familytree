@@ -179,7 +179,14 @@ export const useAppData = () => {
 
   const signInWithEmail = async (email: string) => {
     if (!supabase) return { error: "Supabase not configured." };
-    const { error } = await supabase.auth.signInWithOtp({ email });
+    const redirectTo =
+      typeof window !== "undefined"
+        ? `${window.location.origin}`
+        : process.env.NEXT_PUBLIC_SITE_URL;
+    const { error } = await supabase.auth.signInWithOtp({
+      email,
+      options: redirectTo ? { emailRedirectTo: redirectTo } : undefined,
+    });
     return { error: error?.message };
   };
 
