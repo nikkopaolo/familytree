@@ -775,38 +775,46 @@ export const useAppData = () => {
         setIsGuest(true);
         setMemberships([]);
         setBranchOwners([]);
-      } else {
-        setCurrentUser({
-          id: user.id,
-          name: user.user_metadata?.full_name ?? user.email?.split("@")[0] ?? "Member",
-          email: user.email ?? "",
-        });
-        setIsGuest(false);
+        return;
+      }
 
-        await bootstrapAdmin();
+      setCurrentUser({
+        id: user.id,
+        name: user.user_metadata?.full_name ?? user.email?.split("@")[0] ?? "Member",
+        email: user.email ?? "",
+      });
+      setIsGuest(false);
 
+      await bootstrapAdmin();
+
+      const fetchMemberships = async () => {
         const { data: membershipsRows } = await client
           .from("clan_memberships")
           .select("clan_id, role")
           .eq("user_id", user.id);
-        setMemberships(
-          (membershipsRows ?? []).map((row: any) => ({
-            clanId: row.clan_id,
-            role: row.role,
-          }))
-        );
+        return (membershipsRows ?? []).map((row: any) => ({
+          clanId: row.clan_id,
+          role: row.role,
+        }));
+      };
 
-        const { data: ownersRows } = await client
-          .from("branch_owners")
-          .select("clan_id, branch_root_id")
-          .eq("user_id", user.id);
-        setBranchOwners(
-          (ownersRows ?? []).map((row: any) => ({
-            clanId: row.clan_id,
-            branchRootId: row.branch_root_id,
-          }))
-        );
+      let membershipsList = await fetchMemberships();
+      if (membershipsList.length === 0) {
+        await bootstrapAdmin();
+        membershipsList = await fetchMemberships();
       }
+      setMemberships(membershipsList);
+
+      const { data: ownersRows } = await client
+        .from("branch_owners")
+        .select("clan_id, branch_root_id")
+        .eq("user_id", user.id);
+      setBranchOwners(
+        (ownersRows ?? []).map((row: any) => ({
+          clanId: row.clan_id,
+          branchRootId: row.branch_root_id,
+        }))
+      );
     };
 
     loadSession();
