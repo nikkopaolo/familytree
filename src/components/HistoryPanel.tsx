@@ -1,5 +1,6 @@
 "use client";
 
+import { useEffect, useMemo, useState } from "react";
 import type { ChangeEvent, Person } from "@/lib/types";
 import { formatDate } from "@/lib/utils";
 
@@ -12,14 +13,41 @@ const findPersonName = (persons: Person[], id?: string) =>
   persons.find((person) => person.id === id)?.fullName ?? "Unknown member";
 
 export const HistoryPanel = ({ events, persons }: HistoryPanelProps) => {
+  const [page, setPage] = useState(1);
+  const pageSize = 6;
+  const filteredEvents = useMemo(
+    () =>
+      events.filter(
+        (event) =>
+          event.targetType !== "position" &&
+          (event.action === "create" || event.action === "update" || event.action === "delete")
+      ),
+    [events]
+  );
+  const totalPages = Math.max(1, Math.ceil(filteredEvents.length / pageSize));
+
+  useEffect(() => {
+    setPage((prev) => Math.min(Math.max(1, prev), totalPages));
+  }, [totalPages]);
+
+  const pageEvents = useMemo(() => {
+    const start = (page - 1) * pageSize;
+    return filteredEvents.slice(start, start + pageSize);
+  }, [filteredEvents, page, pageSize]);
+
   return (
     <section className="glass-card rounded-3xl p-6">
       <h2 className="text-2xl text-slate-900">Audit & Change History</h2>
       <p className="text-sm text-slate-600">
-        Full diff history across members, relationships, and layout moves.
+        Only member and relationship changes are listed here.
       </p>
       <div className="mt-6 space-y-4">
-        {events.map((event) => (
+        {pageEvents.length === 0 && (
+          <div className="rounded-2xl border border-slate-200 bg-white px-4 py-6 text-sm text-slate-500">
+            No audited changes yet.
+          </div>
+        )}
+        {pageEvents.map((event) => (
           <div key={event.id} className="surface-card rounded-2xl p-4">
             <div className="flex flex-wrap items-center justify-between gap-3">
               <div>
@@ -49,6 +77,31 @@ export const HistoryPanel = ({ events, persons }: HistoryPanelProps) => {
           </div>
         ))}
       </div>
+      {filteredEvents.length > pageSize && (
+        <div className="mt-4 flex items-center justify-between text-xs text-slate-500">
+          <span>
+            Page {page} of {totalPages}
+          </span>
+          <div className="flex items-center gap-2">
+            <button
+              className="rounded-full border border-slate-200 bg-white px-3 py-1 font-semibold text-slate-600 disabled:opacity-50"
+              onClick={() => setPage((prev) => Math.max(1, prev - 1))}
+              disabled={page <= 1}
+              type="button"
+            >
+              Previous
+            </button>
+            <button
+              className="rounded-full border border-slate-200 bg-white px-3 py-1 font-semibold text-slate-600 disabled:opacity-50"
+              onClick={() => setPage((prev) => Math.min(totalPages, prev + 1))}
+              disabled={page >= totalPages}
+              type="button"
+            >
+              Next
+            </button>
+          </div>
+        </div>
+      )}
     </section>
   );
 };

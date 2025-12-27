@@ -778,19 +778,6 @@ export const useAppData = () => {
       x,
       y,
     });
-
-    await supabase.from("change_events").insert({
-      clan_id: activeClanId,
-      actor_id: currentUser.id,
-      actor_name: actorLabel,
-      target_type: "position",
-      target_id: personId,
-      action: "update",
-      diff: [
-        { field: "x", before: "-", after: String(x) },
-        { field: "y", before: "-", after: String(y) },
-      ],
-    });
   };
 
   const uploadPersonPhoto = async (personId: string, file: File) => {
