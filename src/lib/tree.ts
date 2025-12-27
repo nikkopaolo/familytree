@@ -22,15 +22,6 @@ export const filterTree = (
   relationships: Relationship[],
   filter: TreeFilter
 ) => {
-  if (filter.rootId === "all") {
-    return {
-      filteredPersons: persons,
-      filteredRelationships: relationships.filter(
-        (rel) =>
-          rel.relationshipType === "parent" || rel.relationshipType === "partner"
-      ),
-    };
-  }
   const personMap = new Map(persons.map((person) => [person.id, person]));
   const adjacency = new Map<string, string[]>();
   const addAdjacency = (fromId: string, toId: string) => {
@@ -46,9 +37,16 @@ export const filterTree = (
     });
 
   const selected = new Set<string>();
-  const queue: Array<{ id: string; depth: number }> = [
-    { id: filter.rootId, depth: 0 },
-  ];
+  const queue: Array<{ id: string; depth: number }> = [];
+
+  if (filter.rootId === "all") {
+    const childIds = new Set(parentLinks.map((rel) => rel.childId));
+    const roots = persons.filter((person) => !childIds.has(person.id));
+    const seed = roots.length > 0 ? roots : persons;
+    seed.forEach((person) => queue.push({ id: person.id, depth: 0 }));
+  } else {
+    queue.push({ id: filter.rootId, depth: 0 });
+  }
 
   while (queue.length > 0 && selected.size < filter.maxNodes) {
     const current = queue.shift();
@@ -101,7 +99,13 @@ export const buildTreeGraph = ({
 }) => {
   const graph = new dagre.graphlib.Graph();
   graph.setDefaultEdgeLabel(() => ({}));
-  graph.setGraph({ rankdir: direction, nodesep: 60, ranksep: 130 });
+  graph.setGraph({
+    rankdir: direction,
+    nodesep: direction === "TB" ? 90 : 70,
+    ranksep: direction === "TB" ? 190 : 140,
+    edgesep: 20,
+    ranker: "tight-tree",
+  });
 
   persons.forEach((person) => {
     graph.setNode(person.id, { width: NODE_WIDTH, height: NODE_HEIGHT });
@@ -165,19 +169,20 @@ export const buildTreeGraph = ({
 
   familyGroups.forEach((group) => {
     graph.setNode(group.id, { width: FAMILY_NODE_SIZE, height: FAMILY_NODE_SIZE });
-    graph.setEdge(group.parentA, group.id, { weight: 0.6, minlen: 1 });
-    graph.setEdge(group.parentB, group.id, { weight: 0.6, minlen: 1 });
+    graph.setEdge(group.parentA, group.id, { weight: 1.2, minlen: 1 });
+    graph.setEdge(group.parentB, group.id, { weight: 1.2, minlen: 1 });
+    graph.setEdge(group.parentA, group.parentB, { weight: 2.5, minlen: 1 });
     group.children.forEach((childId) => {
-      graph.setEdge(group.id, childId, { weight: 1, minlen: 1 });
+      graph.setEdge(group.id, childId, { weight: 2, minlen: 2 });
     });
   });
 
   parentLinks.forEach((rel) => {
     if (familyParentChildPairs.has(`${rel.parentId}|${rel.childId}`)) return;
-    graph.setEdge(rel.parentId, rel.childId, { weight: 1, minlen: 1 });
+    graph.setEdge(rel.parentId, rel.childId, { weight: 1.5, minlen: 2 });
   });
   partnerLinks.forEach((rel) => {
-    graph.setEdge(rel.parentId, rel.childId, { weight: 0.2, minlen: 1 });
+    graph.setEdge(rel.parentId, rel.childId, { weight: 2, minlen: 1 });
   });
 
   dagre.layout(graph);

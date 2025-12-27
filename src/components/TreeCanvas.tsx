@@ -70,6 +70,9 @@ export const TreeCanvas = ({
   const [direction, setDirection] = useState<TreeLayoutDirection>("TB");
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [isArranging, setIsArranging] = useState(false);
+  const [searchQuery, setSearchQuery] = useState("");
+  const [pendingFocusId, setPendingFocusId] = useState<string | null>(null);
+  const [statusFilter, setStatusFilter] = useState<"all" | "alive" | "deceased">("all");
   const [flowInstance, setFlowInstance] = useState<ReactFlowInstance | null>(null);
   const hasPeople = persons.length > 0;
 
@@ -97,14 +100,32 @@ export const TreeCanvas = ({
     if (!hasPeople) {
       return { nodes: [], edges: [] };
     }
+    const statusFilteredPersons =
+      statusFilter === "all"
+        ? filteredPersons
+        : filteredPersons.filter((person) =>
+            statusFilter === "alive" ? person.isAlive : !person.isAlive
+          );
+    const statusIds = new Set(statusFilteredPersons.map((person) => person.id));
+    const statusFilteredRelationships = filteredRelationships.filter(
+      (rel) => statusIds.has(rel.parentId) && statusIds.has(rel.childId)
+    );
     return buildTreeGraph({
-      persons: filteredPersons,
-      relationships: filteredRelationships,
+      persons: statusFilteredPersons,
+      relationships: statusFilteredRelationships,
       positions,
       direction,
       manualPositions,
     });
-  }, [filteredPersons, filteredRelationships, positions, direction, manualPositions, hasPeople]);
+  }, [
+    filteredPersons,
+    filteredRelationships,
+    positions,
+    direction,
+    manualPositions,
+    hasPeople,
+    statusFilter,
+  ]);
 
   const shouldAutoFit = useMemo(() => Object.keys(manualPositions).length === 0, [manualPositions]);
 
@@ -120,6 +141,32 @@ export const TreeCanvas = ({
     direction,
     rootId,
   ]);
+
+  useEffect(() => {
+    if (!pendingFocusId || !flowInstance) return;
+    const targetNode = nodes.find((node) => node.id === pendingFocusId);
+    if (!targetNode) return;
+    flowInstance.fitView({ nodes: [targetNode], padding: 0.4, duration: 400 });
+    setPendingFocusId(null);
+  }, [flowInstance, nodes, pendingFocusId]);
+
+  const searchResults = useMemo(() => {
+    const query = searchQuery.trim().toLowerCase();
+    if (!query) return [];
+    return persons
+      .filter((person) => person.fullName.toLowerCase().includes(query))
+      .slice(0, 8);
+  }, [persons, searchQuery]);
+
+  const handleFocusPerson = (personId: string) => {
+    setPendingFocusId(personId);
+    onSelectPerson(personId);
+    onRootChange(personId);
+    const person = persons.find((item) => item.id === personId);
+    if (person) {
+      setSearchQuery(person.fullName);
+    }
+  };
 
   const nodeHighlight = useMemo(() => {
     const selected = new Set([selectedPersonId]);
@@ -366,6 +413,32 @@ export const TreeCanvas = ({
             ))}
           </select>
         </div>
+        <div className="relative">
+          <p className="text-xs font-semibold uppercase tracking-[0.2em] text-slate-500">
+            Find Member
+          </p>
+          <input
+            className="mt-2 w-48 rounded-2xl border border-slate-200 bg-white px-4 py-2 text-sm font-semibold text-slate-800"
+            placeholder="Search name"
+            value={searchQuery}
+            onChange={(event) => setSearchQuery(event.target.value)}
+          />
+          {searchResults.length > 0 && (
+            <div className="absolute left-0 top-full z-20 mt-2 w-56 rounded-2xl border border-slate-200 bg-white p-2 text-xs shadow-lg">
+              {searchResults.map((person) => (
+                <button
+                  key={person.id}
+                  className="flex w-full items-center justify-between rounded-xl px-3 py-2 text-left text-slate-700 hover:bg-amber-50"
+                  onClick={() => handleFocusPerson(person.id)}
+                  type="button"
+                >
+                  <span className="truncate">{person.fullName}</span>
+                  <span className="text-[10px] text-slate-400">Focus</span>
+                </button>
+              ))}
+            </div>
+          )}
+        </div>
         <div>
           <p className="text-xs font-semibold uppercase tracking-[0.2em] text-slate-500">
             Max Generations
@@ -377,7 +450,6 @@ export const TreeCanvas = ({
             className="mt-2 w-32 rounded-2xl border border-slate-200 bg-white px-4 py-2 text-sm font-semibold text-slate-800"
             value={maxDepth}
             onChange={(event) => onMaxDepthChange(Number(event.target.value))}
-            disabled={rootId === "all"}
           />
         </div>
         <div>
@@ -391,8 +463,28 @@ export const TreeCanvas = ({
             className="mt-2 w-32 rounded-2xl border border-slate-200 bg-white px-4 py-2 text-sm font-semibold text-slate-800"
             value={maxNodes}
             onChange={(event) => onMaxNodesChange(Number(event.target.value))}
-            disabled={rootId === "all"}
           />
+        </div>
+        <div>
+          <p className="text-xs font-semibold uppercase tracking-[0.2em] text-slate-500">
+            Filter
+          </p>
+          <div className="mt-2 flex gap-2">
+            {(["all", "alive", "deceased"] as const).map((value) => (
+              <button
+                key={value}
+                className={`rounded-full px-4 py-2 text-xs font-semibold ${
+                  statusFilter === value
+                    ? "bg-amber-500 text-white"
+                    : "bg-white text-slate-600"
+                }`}
+                onClick={() => setStatusFilter(value)}
+                type="button"
+              >
+                {value === "all" ? "All" : value === "alive" ? "Alive" : "Deceased"}
+              </button>
+            ))}
+          </div>
         </div>
         <div>
           <p className="text-xs font-semibold uppercase tracking-[0.2em] text-slate-500">
