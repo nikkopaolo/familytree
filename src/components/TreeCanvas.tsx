@@ -1,7 +1,13 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import ReactFlow, { Background, Controls, MiniMap, Node } from "reactflow";
+import ReactFlow, {
+  Background,
+  Controls,
+  MiniMap,
+  Node,
+  type ReactFlowInstance,
+} from "reactflow";
 import "reactflow/dist/style.css";
 import { PersonNode } from "./PersonNode";
 import { FamilyNode } from "./FamilyNode";
@@ -55,6 +61,7 @@ export const TreeCanvas = ({
 }: TreeCanvasProps) => {
   const [direction, setDirection] = useState<TreeLayoutDirection>("TB");
   const [isFullscreen, setIsFullscreen] = useState(false);
+  const [flowInstance, setFlowInstance] = useState<ReactFlowInstance | null>(null);
   const hasPeople = persons.length > 0;
 
   useEffect(() => {
@@ -89,6 +96,21 @@ export const TreeCanvas = ({
       manualPositions,
     });
   }, [filteredPersons, filteredRelationships, positions, direction, manualPositions, hasPeople]);
+
+  const shouldAutoFit = useMemo(() => Object.keys(manualPositions).length === 0, [manualPositions]);
+
+  useEffect(() => {
+    if (!flowInstance || !shouldAutoFit) return;
+    if (nodes.length === 0) return;
+    flowInstance.fitView({ padding: 0.2, duration: 300 });
+  }, [
+    flowInstance,
+    shouldAutoFit,
+    nodes.length,
+    edges.length,
+    direction,
+    rootId,
+  ]);
 
   const nodeHighlight = useMemo(() => {
     const selected = new Set([selectedPersonId]);
@@ -302,6 +324,7 @@ export const TreeCanvas = ({
           edges={edges}
           nodeTypes={nodeTypes}
           fitView
+          onInit={setFlowInstance}
           onNodeClick={(_, node) => {
             if (node.type === "person") {
               onSelectPerson(node.id);
