@@ -299,7 +299,7 @@ export const TreeCanvas = ({
   }, [persons, relationships]);
 
   const interactiveNodes = useMemo(() => {
-    return nodeHighlight.map((node) => {
+    const mapped = nodeHighlight.map((node) => {
       if (node.type !== "person") {
         return node;
       }
@@ -347,6 +347,15 @@ export const TreeCanvas = ({
         },
       };
     });
+    if (!editingNodeId) return mapped;
+    const editingIndex = mapped.findIndex((node) => node.id === editingNodeId);
+    if (editingIndex === -1) return mapped;
+    const editingNode = mapped[editingIndex];
+    return [
+      ...mapped.slice(0, editingIndex),
+      ...mapped.slice(editingIndex + 1),
+      editingNode,
+    ];
   }, [
     nodeHighlight,
     relationshipStats,
