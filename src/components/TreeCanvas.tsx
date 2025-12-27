@@ -321,6 +321,7 @@ export const TreeCanvas = ({
       const isEditing = editingNodeId === node.id;
       return {
         ...node,
+        zIndex: isEditing ? 1000 : node.zIndex,
         style: {
           ...(node.style ?? {}),
           zIndex: isEditing ? 1000 : node.style?.zIndex,

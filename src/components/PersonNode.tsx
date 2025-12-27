@@ -216,7 +216,7 @@ export const PersonNode = ({ data, selected }: NodeProps<PersonNodeData>) => {
       className={`react-flow__node-person group relative w-[280px] min-h-[170px] overflow-visible rounded-2xl px-4 py-3 transition hover:z-50 ${
         isEditing ? "z-50" : "z-0"
       } ${selected ? "ring-2 ring-amber-300" : "ring-0"}`}
-      style={isEditing ? { zIndex: 60 } : undefined}
+      style={isEditing ? { zIndex: 1000 } : undefined}
     >
       <Handle id="parent-top" type="target" position={Position.Top} style={{ opacity: 0 }} />
       <Handle id="parent-bottom" type="source" position={Position.Bottom} style={{ opacity: 0 }} />

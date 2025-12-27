@@ -234,67 +234,74 @@ export const StatsPanel = ({ persons, relationships = [] }: StatsPanelProps) => 
           </div>
           <div className="grid gap-6 md:grid-cols-2">
             <div className="surface-card rounded-2xl p-4">
-            <p className="text-xs font-semibold uppercase tracking-[0.2em] text-slate-500">
-              Status Mix
-            </p>
-            <div className="mt-4 h-40">
-              <ResponsiveContainer width="100%" height="100%">
-                <PieChart>
-                  <Pie data={aliveBreakdown} dataKey="value" nameKey="name" innerRadius={35} outerRadius={60}>
-                    {aliveBreakdown.map((entry) => (
-                      <Cell
-                        key={entry.name}
-                        fill={entry.name === "Alive" ? "#2f6f4e" : "#e76f51"}
-                      />
-                    ))}
-                  </Pie>
-                  <Tooltip />
-                </PieChart>
-              </ResponsiveContainer>
-            </div>
-            <div className="mt-4 flex items-center justify-between text-sm text-slate-600">
-              <span>Alive: {aliveCount}</span>
-              <span>Deceased: {deceasedCount}</span>
-            </div>
-          </div>
-          <div className="surface-card rounded-2xl p-4">
-            <p className="text-xs font-semibold uppercase tracking-[0.2em] text-slate-500">
-              Age Spread
-            </p>
-            <div className="mt-4 h-40">
-              <ResponsiveContainer width="100%" height="100%">
-                <BarChart data={ageDistribution}>
-                  <XAxis dataKey="bucket" fontSize={10} />
-                  <YAxis allowDecimals={false} fontSize={10} />
-                  <Tooltip />
-                  <Bar dataKey="count" fill="#1f6f8b" radius={[8, 8, 0, 0]} />
-                </BarChart>
-              </ResponsiveContainer>
-            </div>
-            <div className="mt-4 grid grid-cols-2 gap-2 text-xs text-slate-600">
-              <div>
-                <p className="font-semibold text-slate-500">Avg age (alive)</p>
-                <p className="text-sm font-semibold text-slate-900">
-                  {ageInsights.avgAlive ? Math.round(ageInsights.avgAlive) : "N/A"}
-                </p>
+              <p className="text-xs font-semibold uppercase tracking-[0.2em] text-slate-500">
+                Status Mix
+              </p>
+              <div className="mt-4 h-40">
+                <ResponsiveContainer width="100%" height="100%">
+                  <PieChart>
+                    <Pie
+                      data={aliveBreakdown}
+                      dataKey="value"
+                      nameKey="name"
+                      innerRadius={35}
+                      outerRadius={60}
+                    >
+                      {aliveBreakdown.map((entry) => (
+                        <Cell
+                          key={entry.name}
+                          fill={entry.name === "Alive" ? "#2f6f4e" : "#e76f51"}
+                        />
+                      ))}
+                    </Pie>
+                    <Tooltip />
+                  </PieChart>
+                </ResponsiveContainer>
               </div>
-              <div>
-                <p className="font-semibold text-slate-500">Median age</p>
-                <p className="text-sm font-semibold text-slate-900">
-                  {ageInsights.medianAlive ? Math.round(ageInsights.medianAlive) : "N/A"}
-                </p>
+              <div className="mt-4 flex items-center justify-between text-sm text-slate-600">
+                <span>Alive: {aliveCount}</span>
+                <span>Deceased: {deceasedCount}</span>
               </div>
-              <div>
-                <p className="font-semibold text-slate-500">Youngest</p>
-                <p className="text-sm font-semibold text-slate-900">
-                  {ageInsights.youngest ?? "N/A"}
-                </p>
+            </div>
+            <div className="surface-card rounded-2xl p-4">
+              <p className="text-xs font-semibold uppercase tracking-[0.2em] text-slate-500">
+                Age Spread
+              </p>
+              <div className="mt-4 h-40">
+                <ResponsiveContainer width="100%" height="100%">
+                  <BarChart data={ageDistribution}>
+                    <XAxis dataKey="bucket" fontSize={10} />
+                    <YAxis allowDecimals={false} fontSize={10} />
+                    <Tooltip />
+                    <Bar dataKey="count" fill="#1f6f8b" radius={[8, 8, 0, 0]} />
+                  </BarChart>
+                </ResponsiveContainer>
               </div>
-              <div>
-                <p className="font-semibold text-slate-500">Oldest</p>
-                <p className="text-sm font-semibold text-slate-900">
-                  {ageInsights.oldest ?? "N/A"}
-                </p>
+              <div className="mt-4 grid grid-cols-2 gap-2 text-xs text-slate-600">
+                <div>
+                  <p className="font-semibold text-slate-500">Avg age (alive)</p>
+                  <p className="text-sm font-semibold text-slate-900">
+                    {ageInsights.avgAlive ? Math.round(ageInsights.avgAlive) : "N/A"}
+                  </p>
+                </div>
+                <div>
+                  <p className="font-semibold text-slate-500">Median age</p>
+                  <p className="text-sm font-semibold text-slate-900">
+                    {ageInsights.medianAlive ? Math.round(ageInsights.medianAlive) : "N/A"}
+                  </p>
+                </div>
+                <div>
+                  <p className="font-semibold text-slate-500">Youngest</p>
+                  <p className="text-sm font-semibold text-slate-900">
+                    {ageInsights.youngest ?? "N/A"}
+                  </p>
+                </div>
+                <div>
+                  <p className="font-semibold text-slate-500">Oldest</p>
+                  <p className="text-sm font-semibold text-slate-900">
+                    {ageInsights.oldest ?? "N/A"}
+                  </p>
+                </div>
               </div>
             </div>
           </div>
@@ -355,14 +362,12 @@ export const StatsPanel = ({ persons, relationships = [] }: StatsPanelProps) => 
                 <p className="text-sm text-slate-500">No birthdays for this month.</p>
               )}
               {selectedMonthPeople.map((entry) => {
-                if (!entry) return null;
                 const person = entry.person;
                 return (
                   <div key={person.id} className="flex items-center justify-between gap-3">
                     <span className="font-semibold text-slate-800">{person.fullName}</span>
                     <span className="text-xs text-slate-500">
-                      Day {entry.day} • Age {calculateAge(person.birthDate, person.deathDate)}
-                      {" • "}
+                      Day {entry.day} - Age {calculateAge(person.birthDate, person.deathDate)} -
                       {person.stats?.location ?? "Unknown"}
                     </span>
                   </div>
