@@ -133,7 +133,6 @@ export const useAppData = () => {
   const [branchOwners, setBranchOwners] = useState<BranchOwner[]>([]);
   const [manualPositions, setManualPositions] = useState<Record<string, { x: number; y: number }>>({});
   const [selectedPersonId, setSelectedPersonId] = useState<string>("");
-  const [clansVersion, setClansVersion] = useState(0);
   const [adminBootstrapError, setAdminBootstrapError] = useState("");
 
   const isSupabaseEnabled = Boolean(isSupabaseConfigured && supabase);
@@ -212,9 +211,6 @@ export const useAppData = () => {
       return;
     }
     setAdminBootstrapError("");
-    if (payload.promoted) {
-      setClansVersion((prev) => prev + 1);
-    }
   };
 
   const inviteAdmin = async (email: string, clanId: string) => {
@@ -901,7 +897,7 @@ export const useAppData = () => {
     return () => {
       listener.subscription.unsubscribe();
     };
-  }, [isSupabaseEnabled, clansVersion]);
+  }, [isSupabaseEnabled]);
 
   useEffect(() => {
     const client = supabase;
