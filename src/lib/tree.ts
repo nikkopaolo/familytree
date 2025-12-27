@@ -22,6 +22,9 @@ export const filterTree = (
   relationships: Relationship[],
   filter: TreeFilter
 ) => {
+  const parentLinks = relationships.filter(
+    (rel) => rel.relationshipType === "parent"
+  );
   const personMap = new Map(persons.map((person) => [person.id, person]));
   const adjacency = new Map<string, string[]>();
   const addAdjacency = (fromId: string, toId: string) => {
@@ -29,12 +32,10 @@ export const filterTree = (
     adjacency.get(fromId)?.push(toId);
   };
 
-  relationships
-    .filter((rel) => rel.relationshipType === "parent")
-    .forEach((rel) => {
-      addAdjacency(rel.parentId, rel.childId);
-      addAdjacency(rel.childId, rel.parentId);
-    });
+  parentLinks.forEach((rel) => {
+    addAdjacency(rel.parentId, rel.childId);
+    addAdjacency(rel.childId, rel.parentId);
+  });
 
   const selected = new Set<string>();
   const queue: Array<{ id: string; depth: number }> = [];
