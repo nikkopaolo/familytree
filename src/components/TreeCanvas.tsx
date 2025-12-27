@@ -39,8 +39,14 @@ type TreeCanvasProps = {
   onRootChange: (id: string) => void;
   maxDepth: number;
   onMaxDepthChange: (value: number) => void;
+  maxDepthValue: number;
+  isMaxDepthUnlimited: boolean;
+  onToggleMaxDepthUnlimited: (value: boolean) => void;
   maxNodes: number;
   onMaxNodesChange: (value: number) => void;
+  maxNodesValue: number;
+  isMaxNodesUnlimited: boolean;
+  onToggleMaxNodesUnlimited: (value: boolean) => void;
 };
 
 const nodeTypes = { person: PersonNode, family: FamilyNode };
@@ -66,8 +72,14 @@ export const TreeCanvas = ({
   onRootChange,
   maxDepth,
   onMaxDepthChange,
+  maxDepthValue,
+  isMaxDepthUnlimited,
+  onToggleMaxDepthUnlimited,
   maxNodes,
   onMaxNodesChange,
+  maxNodesValue,
+  isMaxNodesUnlimited,
+  onToggleMaxNodesUnlimited,
 }: TreeCanvasProps) => {
   const [direction, setDirection] = useState<TreeLayoutDirection>("TB");
   const [isFullscreen, setIsFullscreen] = useState(false);
@@ -163,7 +175,6 @@ export const TreeCanvas = ({
   const handleFocusPerson = (personId: string) => {
     setPendingFocusId(personId);
     onSelectPerson(personId);
-    onRootChange(personId);
     const person = persons.find((item) => item.id === personId);
     if (person) {
       setSearchQuery(person.fullName);
@@ -452,9 +463,18 @@ export const TreeCanvas = ({
             min={1}
             max={8}
             className="mt-2 w-32 rounded-2xl border border-slate-200 bg-white px-4 py-2 text-sm font-semibold text-slate-800"
-            value={maxDepth}
+            value={maxDepthValue}
             onChange={(event) => onMaxDepthChange(Number(event.target.value))}
+            disabled={isMaxDepthUnlimited}
           />
+          <label className="mt-2 flex items-center gap-2 text-xs text-slate-500">
+            <input
+              type="checkbox"
+              checked={isMaxDepthUnlimited}
+              onChange={(event) => onToggleMaxDepthUnlimited(event.target.checked)}
+            />
+            No limit
+          </label>
         </div>
         <div>
           <p className="text-xs font-semibold uppercase tracking-[0.2em] text-slate-500">
@@ -465,9 +485,18 @@ export const TreeCanvas = ({
             min={5}
             max={120}
             className="mt-2 w-32 rounded-2xl border border-slate-200 bg-white px-4 py-2 text-sm font-semibold text-slate-800"
-            value={maxNodes}
+            value={maxNodesValue}
             onChange={(event) => onMaxNodesChange(Number(event.target.value))}
+            disabled={isMaxNodesUnlimited}
           />
+          <label className="mt-2 flex items-center gap-2 text-xs text-slate-500">
+            <input
+              type="checkbox"
+              checked={isMaxNodesUnlimited}
+              onChange={(event) => onToggleMaxNodesUnlimited(event.target.checked)}
+            />
+            No limit
+          </label>
         </div>
         <div>
           <p className="text-xs font-semibold uppercase tracking-[0.2em] text-slate-500">

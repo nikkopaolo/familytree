@@ -60,6 +60,8 @@ export default function Home() {
   const [rootId, setRootId] = useState("");
   const [maxDepth, setMaxDepth] = useState(4);
   const [maxNodes, setMaxNodes] = useState(40);
+  const [unlimitedGenerations, setUnlimitedGenerations] = useState(true);
+  const [unlimitedNodes, setUnlimitedNodes] = useState(true);
   const [addChildParentId, setAddChildParentId] = useState<string>("");
 
   useEffect(() => {
@@ -214,10 +216,16 @@ export default function Home() {
               onSelectPerson={setSelectedPersonId}
               rootId={rootId}
               onRootChange={setRootId}
-              maxDepth={maxDepth}
+              maxDepth={unlimitedGenerations ? Number.POSITIVE_INFINITY : maxDepth}
               onMaxDepthChange={setMaxDepth}
-              maxNodes={maxNodes}
+              maxDepthValue={maxDepth}
+              isMaxDepthUnlimited={unlimitedGenerations}
+              onToggleMaxDepthUnlimited={setUnlimitedGenerations}
+              maxNodes={unlimitedNodes ? Number.POSITIVE_INFINITY : maxNodes}
               onMaxNodesChange={setMaxNodes}
+              maxNodesValue={maxNodes}
+              isMaxNodesUnlimited={unlimitedNodes}
+              onToggleMaxNodesUnlimited={setUnlimitedNodes}
             />
           )}
           {activeTab === "list" && (
