@@ -108,6 +108,18 @@ export default function Home() {
     window.alert("Editing requires an invite with edit access.");
   };
 
+  const handleBulkLocationUpdate = async (ids: string[], location: string) => {
+    const editableIds = ids.filter((id) => {
+      const person = clanPersons.find((item) => item.id === id);
+      return person ? canEditPerson(person) : false;
+    });
+    if (editableIds.length === 0) {
+      window.alert("Editing requires an invite with edit access.");
+      return;
+    }
+    await Promise.all(editableIds.map((id) => applyPersonUpdate(id, { location })));
+  };
+
   const quickStats = useMemo(() => {
     const aliveCount = clanPersons.filter((person) => person.isAlive).length;
     const { totalAge, count } = clanPersons.reduce(
@@ -211,10 +223,12 @@ export default function Home() {
                 persons={clanPersons}
                 onSelectPerson={setSelectedPersonId}
                 selectedPersonId={selectedPersonId}
+                canEditPerson={canEditPerson}
                 canDeleteSelected={canDeleteSelected}
                 canWipe={isAdmin}
                 onDeletePerson={deletePerson}
                 onWipeList={wipeClanData}
+                onBulkUpdateLocation={handleBulkLocationUpdate}
               />
               <ImportExportPanel
                 persons={clanPersons}

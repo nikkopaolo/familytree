@@ -9,23 +9,29 @@ type MembersTableProps = {
   persons: Person[];
   onSelectPerson: (id: string) => void;
   selectedPersonId?: string;
+  canEditPerson?: (person: Person) => boolean;
   canDeleteSelected?: boolean;
   canWipe?: boolean;
   onDeletePerson?: (id: string) => void;
   onWipeList?: () => Promise<{ error?: string }> | { error?: string } | void;
+  onBulkUpdateLocation?: (ids: string[], location: string) => Promise<void> | void;
 };
 
 export const MembersTable = ({
   persons,
   onSelectPerson,
   selectedPersonId,
+  canEditPerson,
   canDeleteSelected = false,
   canWipe = false,
   onDeletePerson,
   onWipeList,
+  onBulkUpdateLocation,
 }: MembersTableProps) => {
   const [query, setQuery] = useState("");
   const [filter, setFilter] = useState<"all" | "alive" | "deceased">("all");
+  const [selectedIds, setSelectedIds] = useState<string[]>([]);
+  const [bulkLocation, setBulkLocation] = useState("");
 
   const handleDeleteSelected = () => {
     if (!selectedPersonId || !onDeletePerson) return;
@@ -55,6 +61,51 @@ export const MembersTable = ({
       return matchesName && matchesFilter;
     });
   }, [filter, persons, query]);
+
+  const filteredIds = useMemo(() => filtered.map((person) => person.id), [filtered]);
+  const selectedSet = useMemo(() => new Set(selectedIds), [selectedIds]);
+  const editableSelectedIds = useMemo(() => {
+    if (!canEditPerson) return selectedIds;
+    return selectedIds.filter((id) => {
+      const person = persons.find((item) => item.id === id);
+      return person ? canEditPerson(person) : false;
+    });
+  }, [canEditPerson, persons, selectedIds]);
+  const hasLockedSelections =
+    canEditPerson && editableSelectedIds.length !== selectedIds.length;
+
+  const toggleSelection = (id: string) => {
+    setSelectedIds((prev) =>
+      prev.includes(id) ? prev.filter((item) => item !== id) : [...prev, id]
+    );
+  };
+
+  const toggleSelectAll = () => {
+    const allSelected = filteredIds.every((id) => selectedSet.has(id));
+    if (allSelected) {
+      setSelectedIds((prev) => prev.filter((id) => !filteredIds.includes(id)));
+      return;
+    }
+    setSelectedIds((prev) => Array.from(new Set([...prev, ...filteredIds])));
+  };
+
+  const clearSelection = () => setSelectedIds([]);
+
+  const handleBulkUpdateLocation = async () => {
+    if (!onBulkUpdateLocation) return;
+    const locationValue = bulkLocation.trim();
+    if (!locationValue) {
+      window.alert("Enter a location to apply.");
+      return;
+    }
+    if (editableSelectedIds.length === 0) {
+      window.alert("Select at least one editable member.");
+      return;
+    }
+    await onBulkUpdateLocation(editableSelectedIds, locationValue);
+    setBulkLocation("");
+    setSelectedIds([]);
+  };
 
   return (
     <section className="glass-card rounded-3xl p-6">
@@ -98,10 +149,56 @@ export const MembersTable = ({
           </button>
         </div>
       </div>
+      <div className="mt-4 flex flex-wrap items-center gap-3 rounded-2xl border border-slate-200 bg-white px-4 py-3 text-xs">
+        <span className="font-semibold text-slate-700">Bulk location</span>
+        <input
+          className="min-w-[180px] flex-1 rounded-xl border border-slate-200 px-3 py-2 text-xs"
+          placeholder="e.g., Candelaria"
+          value={bulkLocation}
+          onChange={(event) => setBulkLocation(event.target.value)}
+        />
+        <button
+          className="rounded-full border border-slate-200 bg-white px-3 py-2 text-xs font-semibold text-slate-600 disabled:opacity-50"
+          onClick={toggleSelectAll}
+          type="button"
+        >
+          {filteredIds.every((id) => selectedSet.has(id)) ? "Clear filtered" : "Select filtered"}
+        </button>
+        <button
+          className="rounded-full border border-slate-200 bg-white px-3 py-2 text-xs font-semibold text-slate-600 disabled:opacity-50"
+          onClick={clearSelection}
+          type="button"
+          disabled={selectedIds.length === 0}
+        >
+          Clear selection
+        </button>
+        <button
+          className="rounded-full bg-amber-500 px-4 py-2 text-xs font-semibold text-white disabled:opacity-50"
+          onClick={handleBulkUpdateLocation}
+          disabled={!onBulkUpdateLocation || editableSelectedIds.length === 0}
+          type="button"
+        >
+          Apply location
+        </button>
+        <span className="text-slate-500">
+          {editableSelectedIds.length} of {selectedIds.length} selected
+        </span>
+        {hasLockedSelections && (
+          <span className="text-amber-600">Some selections are read-only.</span>
+        )}
+      </div>
       <div className="mt-6 overflow-hidden rounded-2xl border border-slate-200 bg-white">
         <table className="min-w-full text-left text-sm">
           <thead className="bg-slate-50 text-xs uppercase tracking-wider text-slate-500">
             <tr>
+              <th className="px-4 py-3">
+                <input
+                  type="checkbox"
+                  aria-label="Select filtered members"
+                  checked={filteredIds.length > 0 && filteredIds.every((id) => selectedSet.has(id))}
+                  onChange={toggleSelectAll}
+                />
+              </th>
               <th className="px-4 py-3">Member</th>
               <th className="px-4 py-3">Status</th>
               <th className="px-4 py-3">Birthday</th>
@@ -117,6 +214,17 @@ export const MembersTable = ({
                 className="cursor-pointer border-t border-slate-100 hover:bg-amber-50/40"
                 onClick={() => onSelectPerson(person.id)}
               >
+                <td
+                  className="px-4 py-4"
+                  onClick={(event) => event.stopPropagation()}
+                >
+                  <input
+                    type="checkbox"
+                    aria-label={`Select ${person.fullName}`}
+                    checked={selectedSet.has(person.id)}
+                    onChange={() => toggleSelection(person.id)}
+                  />
+                </td>
                 <td className="px-4 py-4 font-semibold text-slate-800">{person.fullName}</td>
                 <td className="px-4 py-4">
                   <span
