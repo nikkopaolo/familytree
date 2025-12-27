@@ -27,6 +27,7 @@ type PersonNodeData = {
   onAddChild: () => void;
   onAddPartner: () => void;
   onUpdate: (payload: Record<string, unknown>) => Promise<void> | void;
+  onEditStateChange: (id: string, editing: boolean) => void;
   onDeleteRelationship: (relationshipId: string) => void;
   onLinkParent: (parentId: string) => void;
   onLinkChild: (childId: string) => void;
@@ -76,6 +77,7 @@ export const PersonNode = ({ data, selected }: NodeProps<PersonNodeData>) => {
     onAddChild,
     onAddPartner,
     onUpdate,
+    onEditStateChange,
     onDeleteRelationship,
     onLinkParent,
     onLinkChild,
@@ -137,6 +139,13 @@ export const PersonNode = ({ data, selected }: NodeProps<PersonNodeData>) => {
     setIsSaving(false);
     setLinkState({ parentId: "", childId: "", partnerId: "" });
   }, [person.id]);
+
+  useEffect(() => {
+    onEditStateChange(person.id, isEditing);
+    return () => {
+      onEditStateChange(person.id, false);
+    };
+  }, [isEditing, onEditStateChange, person.id]);
 
   const startEditing = (event: MouseEvent<HTMLButtonElement>) => {
     event.stopPropagation();

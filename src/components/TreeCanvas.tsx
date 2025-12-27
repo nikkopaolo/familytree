@@ -82,6 +82,7 @@ export const TreeCanvas = ({
   const [pendingFocusId, setPendingFocusId] = useState<string | null>(null);
   const [statusFilter, setStatusFilter] = useState<"all" | "alive" | "deceased">("all");
   const [flowInstance, setFlowInstance] = useState<ReactFlowInstance | null>(null);
+  const [editingNodeId, setEditingNodeId] = useState("");
   const hasPeople = persons.length > 0;
 
   useEffect(() => {
@@ -317,8 +318,13 @@ export const TreeCanvas = ({
         eligibleChildren: [],
         eligiblePartners: [],
       };
+      const isEditing = editingNodeId === node.id;
       return {
         ...node,
+        style: {
+          ...(node.style ?? {}),
+          zIndex: isEditing ? 1000 : node.style?.zIndex,
+        },
         data: {
           person,
           stats,
@@ -327,6 +333,12 @@ export const TreeCanvas = ({
           onAddChild: () => onAddChild(person.id),
           onAddPartner: () => onAddPartner(person.id),
           onUpdate: (payload: Record<string, unknown>) => onUpdatePerson(person.id, payload),
+          onEditStateChange: (id: string, editing: boolean) => {
+            setEditingNodeId((prev) => {
+              if (editing) return id;
+              return prev === id ? "" : prev;
+            });
+          },
           onDeleteRelationship,
           onLinkParent: (parentId: string) => onLinkParent(person.id, parentId),
           onLinkChild: (childId: string) => onLinkChild(person.id, childId),
@@ -346,6 +358,7 @@ export const TreeCanvas = ({
     onLinkParent,
     onLinkChild,
     onLinkPartner,
+    editingNodeId,
   ]);
 
   const handleAutoArrange = async () => {

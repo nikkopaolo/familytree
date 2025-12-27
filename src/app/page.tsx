@@ -238,7 +238,9 @@ export default function Home() {
               />
             </>
           )}
-          {activeTab === "stats" && <StatsPanel persons={clanPersons} />}
+          {activeTab === "stats" && (
+            <StatsPanel persons={clanPersons} relationships={clanRelationships} />
+          )}
           {activeTab === "history" && <HistoryPanel events={clanEvents} persons={clanPersons} />}
         </section>
         <div className="flex flex-col gap-6">
