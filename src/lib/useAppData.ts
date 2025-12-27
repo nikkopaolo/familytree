@@ -27,6 +27,11 @@ type BranchOwner = {
   branchRootId: string;
 };
 
+const mergeById = <T extends { id: string }>(current: T[], incoming: T[]) => {
+  const incomingIds = new Set(incoming.map((item) => item.id));
+  return [...incoming, ...current.filter((item) => !incomingIds.has(item.id))];
+};
+
 const guestProfile: UserProfile = {
   id: "guest",
   name: "Guest",
@@ -403,17 +408,34 @@ export const useAppData = () => {
       return;
     }
 
-    await supabase
-      .from("relationships")
-      .delete()
-      .eq("clan_id", activeClanId)
-      .or(`parent_id.eq.${personId},child_id.eq.${personId}`);
-    await supabase
-      .from("person_positions")
-      .delete()
-      .eq("clan_id", activeClanId)
-      .eq("person_id", personId);
-    await supabase.from("persons").delete().eq("id", personId);
+    let deletedViaAdmin = false;
+    const { data: sessionData } = await supabase.auth.getSession();
+    const token = sessionData.session?.access_token;
+    if (token) {
+      const response = await fetch("/api/admin/delete-person", {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${token}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ clanId: activeClanId, personId }),
+      });
+      deletedViaAdmin = response.ok;
+    }
+
+    if (!deletedViaAdmin) {
+      await supabase
+        .from("relationships")
+        .delete()
+        .eq("clan_id", activeClanId)
+        .or(`parent_id.eq.${personId},child_id.eq.${personId}`);
+      await supabase
+        .from("person_positions")
+        .delete()
+        .eq("clan_id", activeClanId)
+        .eq("person_id", personId);
+      await supabase.from("persons").delete().eq("id", personId);
+    }
 
     await supabase.from("change_events").insert({
       clan_id: activeClanId,
@@ -827,14 +849,36 @@ export const useAppData = () => {
     }));
 
     if (!isSupabaseEnabled || !supabase) {
-      setPersons((prev) => [...incomingPersons, ...prev]);
-      setRelationships((prev) => [...incomingRelationships, ...prev]);
+      setPersons((prev) => mergeById(prev, incomingPersons));
+      setRelationships((prev) => mergeById(prev, incomingRelationships));
       return;
+    }
+
+    const { data: sessionData } = await supabase.auth.getSession();
+    const token = sessionData.session?.access_token;
+    if (token) {
+      const response = await fetch("/api/admin/import", {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${token}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          clanId: activeClanId,
+          persons: incomingPersons,
+          relationships: incomingRelationships,
+        }),
+      });
+      if (response.ok) {
+        setPersons((prev) => mergeById(prev, incomingPersons));
+        setRelationships((prev) => mergeById(prev, incomingRelationships));
+        return;
+      }
     }
 
     const { data: insertedPersons } = await supabase
       .from("persons")
-      .insert(
+      .upsert(
         incomingPersons.map((person) => ({
           id: person.id,
           clan_id: activeClanId,
@@ -847,29 +891,31 @@ export const useAppData = () => {
           photo_url: person.photoUrl ?? null,
           notes: person.notes ?? null,
           stats: person.stats ?? {},
-        }))
+        })),
+        { onConflict: "id" }
       )
       .select();
 
     const { data: insertedRelationships } = await supabase
       .from("relationships")
-      .insert(
+      .upsert(
         incomingRelationships.map((rel) => ({
           id: rel.id,
           clan_id: activeClanId,
           parent_id: rel.parentId,
           child_id: rel.childId,
           relationship_type: rel.relationshipType ?? "parent",
-        }))
+        })),
+        { onConflict: "id" }
       )
       .select();
 
     if (insertedPersons) {
-      setPersons((prev) => [...insertedPersons.map(mapPersonRow), ...prev]);
+      setPersons((prev) => mergeById(prev, insertedPersons.map(mapPersonRow)));
     }
 
     if (insertedRelationships) {
-      setRelationships((prev) => [...insertedRelationships.map(mapRelationshipRow), ...prev]);
+      setRelationships((prev) => mergeById(prev, insertedRelationships.map(mapRelationshipRow)));
     }
   };
 

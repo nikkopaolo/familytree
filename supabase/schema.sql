@@ -22,7 +22,7 @@ create table if not exists public.clan_memberships (
   id uuid primary key default gen_random_uuid(),
   clan_id uuid not null references public.clans on delete cascade,
   user_id uuid not null references auth.users on delete cascade,
-  role text not null check (role in ("admin", "member")),
+  role text not null check (role in ('admin', 'member')),
   created_at timestamptz not null default now(),
   unique (clan_id, user_id)
 );
@@ -214,6 +214,13 @@ with check (
 
 create policy "persons_update_admin_or_owner"
 on public.persons for update
+using (
+  public.is_clan_admin(clan_id)
+  or public.is_branch_owner(clan_id, branch_root_id)
+);
+
+create policy "persons_delete_admin_or_owner"
+on public.persons for delete
 using (
   public.is_clan_admin(clan_id)
   or public.is_branch_owner(clan_id, branch_root_id)
