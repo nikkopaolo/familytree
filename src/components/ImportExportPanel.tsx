@@ -14,8 +14,12 @@ import {
 type ImportExportPanelProps = {
   persons: Person[];
   relationships: Relationship[];
-  onImportCsv: (rows: Array<Record<string, string>>) => void;
-  onImportJson: (payload: { persons: Person[]; relationships: Relationship[] }) => void;
+  onImportCsv: (
+    rows: Array<Record<string, string>>
+  ) => Promise<{ error?: string }> | { error?: string } | void;
+  onImportJson: (
+    payload: { persons: Person[]; relationships: Relationship[] }
+  ) => Promise<{ error?: string }> | { error?: string } | void;
 };
 
 export const ImportExportPanel = ({
@@ -49,7 +53,11 @@ export const ImportExportPanel = ({
     if (file.name.endsWith(".json")) {
       try {
         const parsed = JSON.parse(text);
-        onImportJson(parsed);
+        const result = await onImportJson(parsed);
+        if (result && result.error) {
+          setMessage(result.error);
+          return;
+        }
         setMessage("Tree JSON imported. Relationships preserved.");
       } catch (error) {
         setMessage("Invalid JSON file.");
@@ -58,13 +66,21 @@ export const ImportExportPanel = ({
     }
     if (file.name.endsWith(".csv")) {
       const rows = parsePeopleCsv(text);
-      onImportCsv(rows);
+      const result = await onImportCsv(rows);
+      if (result && result.error) {
+        setMessage(result.error);
+        return;
+      }
       setMessage("CSV imported. New members added as standalone branches.");
       return;
     }
     if (file.name.endsWith(".ged") || file.name.endsWith(".gedcom")) {
       const parsed = parseGedcom(text);
-      onImportJson(parsed);
+      const result = await onImportJson(parsed);
+      if (result && result.error) {
+        setMessage(result.error);
+        return;
+      }
       setMessage("GEDCOM imported. Relationships preserved.");
       return;
     }

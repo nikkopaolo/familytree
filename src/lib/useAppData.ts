@@ -32,6 +32,20 @@ const mergeById = <T extends { id: string }>(current: T[], incoming: T[]) => {
   return [...incoming, ...current.filter((item) => !incomingIds.has(item.id))];
 };
 
+const uuidPattern =
+  /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+
+const isUuid = (value: string) => uuidPattern.test(value);
+
+const normalizeDateInput = (value: unknown) => {
+  if (!value) return null;
+  const raw = String(value).trim();
+  if (!raw) return null;
+  if (/^\d{4}-\d{2}-\d{2}$/.test(raw)) return raw;
+  if (/^\d{4}$/.test(raw)) return `${raw}-01-01`;
+  return null;
+};
+
 const guestProfile: UserProfile = {
   id: "guest",
   name: "Guest",
@@ -115,7 +129,8 @@ const normalizeImportedPerson = (input: Record<string, any>): Person => {
   const stats = (input.stats ?? {}) as Record<string, unknown>;
   const location = input.location ?? (stats as { location?: string }).location;
   const occupation = input.occupation ?? (stats as { occupation?: string }).occupation;
-  const deathDate = input.deathDate ?? input.death_date ?? undefined;
+  const birthDate = normalizeDateInput(input.birthDate ?? input.birth_date);
+  const deathDate = normalizeDateInput(input.deathDate ?? input.death_date);
   const isAlive =
     deathDate ? false : typeof input.isAlive === "boolean" ? input.isAlive : true;
 
@@ -124,8 +139,8 @@ const normalizeImportedPerson = (input: Record<string, any>): Person => {
     clanId: input.clanId ?? "",
     branchRootId: input.branchRootId ?? input.branch_root_id ?? input.id ?? "",
     fullName: input.fullName ?? input.full_name ?? "New Member",
-    birthDate: input.birthDate ?? input.birth_date ?? undefined,
-    deathDate,
+    birthDate: birthDate ?? undefined,
+    deathDate: deathDate ?? undefined,
     isAlive,
     gender: input.gender ?? undefined,
     photoUrl: input.photoUrl ?? input.photo_url ?? undefined,
@@ -898,17 +913,35 @@ export const useAppData = () => {
   };
 
   const importPeople = async (rows: Array<Record<string, string>>) => {
+    if (isSupabaseEnabled && !isAdmin) {
+      return { error: "Sign in as a clan admin to import." };
+    }
+    let clanId = activeClanId;
+    const validClan = clans.find((clan) => clan.id === clanId);
+    if (!validClan || !isUuid(clanId)) {
+      if (isSupabaseEnabled && supabase) {
+        const { data: clanRows } = await supabase.from("clans").select("id").limit(1);
+        clanId = clanRows?.[0]?.id ?? "";
+        if (clanId) {
+          setActiveClanId(clanId);
+        }
+      }
+    }
+    if (isSupabaseEnabled && (!clanId || !isUuid(clanId))) {
+      return { error: "No valid clan selected for import." };
+    }
     const imported = rows.map((row) => {
       const id = crypto.randomUUID();
-      const deathDate = row.death_date || row.deathDate || undefined;
+      const birthDate = normalizeDateInput(row.birth_date || row.birthDate) ?? undefined;
+      const deathDate = normalizeDateInput(row.death_date || row.deathDate) ?? undefined;
       const isAlive = row.is_alive
         ? row.is_alive.toLowerCase() !== "false"
         : !deathDate;
       return {
         id,
-        clanId: activeClanId,
+        clanId,
         fullName: row.full_name || row.fullName || "New Member",
-        birthDate: row.birth_date || undefined,
+        birthDate,
         deathDate,
         isAlive,
         gender: row.gender || undefined,
@@ -924,15 +957,15 @@ export const useAppData = () => {
 
     if (!isSupabaseEnabled || !supabase) {
       setPersons((prev) => [...imported, ...prev]);
-      return;
+      return { error: "" };
     }
 
     const { data: inserted } = await supabase
       .from("persons")
-      .insert(
+      .upsert(
         imported.map((person) => ({
           id: person.id,
-          clan_id: activeClanId,
+          clan_id: clanId,
           full_name: person.fullName,
           birth_date: person.birthDate ?? null,
           death_date: person.deathDate ?? null,
@@ -941,7 +974,8 @@ export const useAppData = () => {
           photo_url: person.photoUrl ?? null,
           notes: person.notes ?? null,
           stats: person.stats ?? {},
-        }))
+        })),
+        { onConflict: "id" }
       )
       .select();
 
@@ -951,29 +985,72 @@ export const useAppData = () => {
         ...prev.filter((person) => person.clanId !== activeClanId),
       ]);
     }
+    return { error: "" };
   };
 
   const importTreeJson = async (payload: { persons: Person[]; relationships: Relationship[] }) => {
+    if (isSupabaseEnabled && !isAdmin) {
+      return { error: "Sign in as a clan admin to import." };
+    }
+
+    let clanId = activeClanId;
+    const validClan = clans.find((clan) => clan.id === clanId);
+    if (!validClan || !isUuid(clanId)) {
+      if (isSupabaseEnabled && supabase) {
+        const { data: clanRows } = await supabase.from("clans").select("id").limit(1);
+        clanId = clanRows?.[0]?.id ?? "";
+        if (clanId) {
+          setActiveClanId(clanId);
+        }
+      }
+    }
+    if (!clanId || !isUuid(clanId)) {
+      return { error: "No valid clan selected for import." };
+    }
+
+    const idMap = new Map<string, string>();
     const incomingPersons = (payload.persons ?? []).map((person) => {
       const normalized = normalizeImportedPerson(person as Record<string, unknown>);
+      const rawId = String(normalized.id ?? "");
+      const id = isUuid(rawId) ? rawId : crypto.randomUUID();
+      if (rawId && rawId !== id) {
+        idMap.set(rawId, id);
+      }
+      const rawBranch = String(normalized.branchRootId ?? "");
+      const branchRootId = isUuid(rawBranch)
+        ? rawBranch
+        : idMap.get(rawBranch) ?? id;
       return {
         ...normalized,
-        clanId: activeClanId,
-        branchRootId: normalized.branchRootId || normalized.id,
+        id,
+        clanId,
+        branchRootId: branchRootId || id,
       };
     });
-    const incomingRelationships = (payload.relationships ?? []).map((rel) => ({
-      id: rel.id ?? crypto.randomUUID(),
-      clanId: activeClanId,
-      parentId: rel.parentId ?? (rel as any).parent_id,
-      childId: rel.childId ?? (rel as any).child_id,
-      relationshipType: rel.relationshipType ?? (rel as any).relationship_type ?? "parent",
-    }));
+    const incomingRelationships = (payload.relationships ?? [])
+      .map((rel) => {
+        const rawParent = rel.parentId ?? (rel as any).parent_id;
+        const rawChild = rel.childId ?? (rel as any).child_id;
+        if (!rawParent || !rawChild) return null;
+        const parentId = idMap.get(String(rawParent)) ?? String(rawParent);
+        const childId = idMap.get(String(rawChild)) ?? String(rawChild);
+        if (!isUuid(parentId) || !isUuid(childId)) return null;
+        const rawId = String(rel.id ?? "");
+        const id = rawId && isUuid(rawId) ? rawId : crypto.randomUUID();
+        return {
+          id,
+          clanId,
+          parentId,
+          childId,
+          relationshipType: rel.relationshipType ?? (rel as any).relationship_type ?? "parent",
+        };
+      })
+      .filter(Boolean) as Relationship[];
 
     if (!isSupabaseEnabled || !supabase) {
       setPersons((prev) => mergeById(prev, incomingPersons));
       setRelationships((prev) => mergeById(prev, incomingRelationships));
-      return;
+      return { error: "" };
     }
 
     const { data: sessionData } = await supabase.auth.getSession();
@@ -986,7 +1063,7 @@ export const useAppData = () => {
           "Content-Type": "application/json",
         },
         body: JSON.stringify({
-          clanId: activeClanId,
+          clanId,
           persons: incomingPersons,
           relationships: incomingRelationships,
         }),
@@ -994,8 +1071,10 @@ export const useAppData = () => {
       if (response.ok) {
         setPersons((prev) => mergeById(prev, incomingPersons));
         setRelationships((prev) => mergeById(prev, incomingRelationships));
-        return;
+        return { error: "" };
       }
+      const payload = await response.json().catch(() => ({}));
+      return { error: payload.error ?? "Import failed. Check the data format." };
     }
 
     const { data: insertedPersons } = await supabase
@@ -1003,7 +1082,7 @@ export const useAppData = () => {
       .upsert(
         incomingPersons.map((person) => ({
           id: person.id,
-          clan_id: activeClanId,
+          clan_id: clanId,
           branch_root_id: person.branchRootId ?? null,
           full_name: person.fullName,
           birth_date: person.birthDate ?? null,
@@ -1023,7 +1102,7 @@ export const useAppData = () => {
       .upsert(
         incomingRelationships.map((rel) => ({
           id: rel.id,
-          clan_id: activeClanId,
+          clan_id: clanId,
           parent_id: rel.parentId,
           child_id: rel.childId,
           relationship_type: rel.relationshipType ?? "parent",
@@ -1039,6 +1118,7 @@ export const useAppData = () => {
     if (insertedRelationships) {
       setRelationships((prev) => mergeById(prev, insertedRelationships.map(mapRelationshipRow)));
     }
+    return { error: "" };
   };
 
   useEffect(() => {

@@ -20,6 +20,20 @@ const chunk = <T,>(items: T[], size: number) => {
   return batches;
 };
 
+const uuidPattern =
+  /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+
+const isUuid = (value: string) => uuidPattern.test(value);
+
+const normalizeDateInput = (value: unknown) => {
+  if (!value) return null;
+  const raw = String(value).trim();
+  if (!raw) return null;
+  if (/^\d{4}-\d{2}-\d{2}$/.test(raw)) return raw;
+  if (/^\d{4}$/.test(raw)) return `${raw}-01-01`;
+  return null;
+};
+
 export async function POST(request: Request) {
   const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL ?? "";
   const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY ?? "";
@@ -65,23 +79,31 @@ export async function POST(request: Request) {
 
   const persons = Array.isArray(body?.persons) ? body.persons : [];
   const relationships = Array.isArray(body?.relationships) ? body.relationships : [];
+  const idMap = new Map<string, string>();
 
   const personRows = persons.map((person: Record<string, unknown>) => {
-    const id = String(person.id ?? crypto.randomUUID());
+    const rawId = String(person.id ?? "");
+    const id = rawId && isUuid(rawId) ? rawId : crypto.randomUUID();
+    if (rawId && rawId !== id) {
+      idMap.set(rawId, id);
+    }
     const stats = (person.stats ?? {}) as Record<string, unknown>;
     const location = person.location ?? (stats as { location?: string }).location;
     const occupation = person.occupation ?? (stats as { occupation?: string }).occupation;
-    const deathDate = person.deathDate ?? person.death_date ?? null;
+    const birthDate = normalizeDateInput(person.birthDate ?? person.birth_date);
+    const deathDate = normalizeDateInput(person.deathDate ?? person.death_date);
     const isAlive =
       deathDate ? false : typeof person.isAlive === "boolean" ? person.isAlive : true;
+    const rawBranch = String(person.branchRootId ?? person.branch_root_id ?? "");
+    const branchRootId = rawBranch && isUuid(rawBranch) ? rawBranch : idMap.get(rawBranch) ?? id;
 
     return {
       id,
       clan_id: clanId,
-      branch_root_id: person.branchRootId ?? person.branch_root_id ?? id,
+      branch_root_id: branchRootId,
       full_name: person.fullName ?? person.full_name ?? "New Member",
-      birth_date: person.birthDate ?? person.birth_date ?? null,
-      death_date: deathDate ?? null,
+      birth_date: birthDate,
+      death_date: deathDate,
       is_alive: isAlive,
       gender: person.gender ?? null,
       photo_url: person.photoUrl ?? person.photo_url ?? null,
@@ -96,11 +118,16 @@ export async function POST(request: Request) {
 
   const relationshipRows = relationships
     .map((rel: Record<string, unknown>) => {
-      const parentId = rel.parentId ?? rel.parent_id;
-      const childId = rel.childId ?? rel.child_id;
-      if (!parentId || !childId) return null;
+      const rawParent = rel.parentId ?? rel.parent_id;
+      const rawChild = rel.childId ?? rel.child_id;
+      if (!rawParent || !rawChild) return null;
+      const parentId = idMap.get(String(rawParent)) ?? String(rawParent);
+      const childId = idMap.get(String(rawChild)) ?? String(rawChild);
+      if (!isUuid(parentId) || !isUuid(childId)) return null;
+      const rawId = String(rel.id ?? "");
+      const id = rawId && isUuid(rawId) ? rawId : crypto.randomUUID();
       return {
-        id: rel.id ?? crypto.randomUUID(),
+        id,
         clan_id: clanId,
         parent_id: parentId,
         child_id: childId,
