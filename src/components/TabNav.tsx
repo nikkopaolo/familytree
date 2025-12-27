@@ -8,6 +8,7 @@ export type AppTab = "tree" | "list" | "stats" | "history" | "suggestions";
 type TabNavProps = {
   activeTab: AppTab;
   onChange: (tab: AppTab) => void;
+  showSuggestions?: boolean;
 };
 
 const tabs: Array<{
@@ -48,10 +49,12 @@ const tabs: Array<{
   },
 ];
 
-export const TabNav = ({ activeTab, onChange }: TabNavProps) => {
+export const TabNav = ({ activeTab, onChange, showSuggestions = true }: TabNavProps) => {
+  const visibleTabs = showSuggestions ? tabs : tabs.filter((tab) => tab.id !== "suggestions");
+  const gridCols = visibleTabs.length >= 5 ? "lg:grid-cols-5" : "lg:grid-cols-4";
   return (
-    <div className="mx-auto mt-6 grid w-[min(1200px,94vw)] grid-cols-1 gap-4 lg:grid-cols-5">
-      {tabs.map((tab) => (
+    <div className={`mx-auto mt-6 grid w-[min(1200px,94vw)] grid-cols-1 gap-4 ${gridCols}`}>
+      {visibleTabs.map((tab) => (
         <button
           key={tab.id}
           onClick={() => onChange(tab.id)}

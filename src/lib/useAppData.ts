@@ -11,16 +11,8 @@ import type {
   Person,
   PersonPosition,
   Relationship,
-  Suggestion,
   UserProfile,
 } from "./types";
-
-type CreateSuggestionInput = {
-  clanId: string;
-  targetId: string;
-  payload: Record<string, unknown>;
-  creatorEmail?: string;
-};
 
 type BranchOwner = {
   clanId: string;
@@ -82,21 +74,6 @@ const mapPositionRow = (row: any): PersonPosition => ({
   y: Number(row.y ?? 0),
 });
 
-const mapSuggestionRow = (row: any): Suggestion => ({
-  id: row.id,
-  clanId: row.clan_id,
-  createdAt: row.created_at,
-  createdBy: row.created_by ?? undefined,
-  creatorEmail: row.creator_email ?? undefined,
-  targetType: row.target_type,
-  targetId: row.target_id ?? undefined,
-  action: row.action,
-  payload: row.payload ?? {},
-  status: row.status,
-  reviewedBy: row.reviewed_by ?? undefined,
-  reviewedAt: row.reviewed_at ?? undefined,
-});
-
 const mapChangeEventRow = (row: any): ChangeEvent => ({
   id: row.id,
   clanId: row.clan_id,
@@ -115,12 +92,12 @@ const resolveActiveClanId = (
   currentId: string,
   storedId?: string
 ) => {
-  if (storedId && clansList.some((clan) => clan.id === storedId)) {
-    return storedId;
-  }
   const membershipClanId = membershipsList[0]?.clanId;
   if (membershipClanId && clansList.some((clan) => clan.id === membershipClanId)) {
     return membershipClanId;
+  }
+  if (storedId && clansList.some((clan) => clan.id === storedId)) {
+    return storedId;
   }
   if (currentId && clansList.some((clan) => clan.id === currentId)) {
     return currentId;
@@ -205,7 +182,6 @@ export const useAppData = () => {
   const [persons, setPersons] = useState<Person[]>(initialData.persons);
   const [relationships, setRelationships] = useState<Relationship[]>(initialData.relationships);
   const [positions, setPositions] = useState<PersonPosition[]>(initialData.positions);
-  const [suggestions, setSuggestions] = useState<Suggestion[]>(initialData.suggestions);
   const [changeEvents, setChangeEvents] = useState<ChangeEvent[]>(initialData.changeEvents);
   const [branchOwners, setBranchOwners] = useState<BranchOwner[]>([]);
   const [manualPositions, setManualPositions] = useState<Record<string, { x: number; y: number }>>({});
@@ -251,17 +227,13 @@ export const useAppData = () => {
     [activeClanId, positions]
   );
 
-  const clanSuggestions = useMemo(
-    () => suggestions.filter((item) => item.clanId === activeClanId),
-    [activeClanId, suggestions]
-  );
-
   const clanEvents = useMemo(
     () => changeEvents.filter((item) => item.clanId === activeClanId),
     [activeClanId, changeEvents]
   );
 
   const canEditPerson = (person: Person) => isAdmin || branchRootIds.has(person.branchRootId);
+  const actorLabel = currentUser.email || currentUser.name || "Member";
 
   const signInWithEmail = async (email: string) => {
     if (!supabase) return { error: "Supabase not configured." };
@@ -317,48 +289,6 @@ export const useAppData = () => {
     }
     return { error: "" };
   };
-  const createSuggestion = async (input: CreateSuggestionInput) => {
-    const normalizedPayload = normalizePersonPayload(input.payload);
-    const suggestion: Suggestion = {
-      id: crypto.randomUUID(),
-      clanId: input.clanId,
-      createdAt: new Date().toISOString(),
-      creatorEmail: input.creatorEmail,
-      targetType: "person",
-      targetId: input.targetId,
-      action: "update",
-      payload: normalizedPayload,
-      status: "pending",
-    };
-
-    if (!isSupabaseEnabled || !supabase) {
-      setSuggestions((prev) => [suggestion, ...prev]);
-      return;
-    }
-
-    const { data: row, error } = await supabase
-      .from("suggestions")
-      .insert({
-        clan_id: input.clanId,
-        created_by: isGuest ? null : currentUser.id,
-        creator_email: input.creatorEmail ?? null,
-        target_type: "person",
-        target_id: input.targetId,
-        action: "update",
-        payload: normalizedPayload,
-        status: "pending",
-      })
-      .select()
-      .single();
-
-    if (!error && row) {
-      setSuggestions((prev) => [mapSuggestionRow(row), ...prev]);
-      return;
-    }
-
-    setSuggestions((prev) => [suggestion, ...prev]);
-  };
-
   const applyPersonUpdate = async (personId: string, payload: Record<string, unknown>) => {
     const target = persons.find((person) => person.id === personId);
     if (!target) return;
@@ -373,7 +303,7 @@ export const useAppData = () => {
           id: crypto.randomUUID(),
           clanId: activeClanId,
           actorId: currentUser.id,
-          actorName: currentUser.name,
+          actorName: actorLabel,
           targetType: "person",
           targetId: updated.id,
           action: "update",
@@ -400,7 +330,7 @@ export const useAppData = () => {
     await supabase.from("change_events").insert({
       clan_id: activeClanId,
       actor_id: currentUser.id,
-      actor_name: currentUser.name,
+      actor_name: actorLabel,
       target_type: "person",
       target_id: personId,
       action: "update",
@@ -412,7 +342,7 @@ export const useAppData = () => {
         id: crypto.randomUUID(),
         clanId: activeClanId,
         actorId: currentUser.id,
-        actorName: currentUser.name,
+        actorName: actorLabel,
         targetType: "person",
         targetId: personId,
         action: "update",
@@ -448,7 +378,7 @@ export const useAppData = () => {
           id: crypto.randomUUID(),
           clanId: activeClanId,
           actorId: currentUser.id,
-          actorName: currentUser.name,
+          actorName: actorLabel,
           targetType: "person",
           targetId: personId,
           action: "delete",
@@ -492,7 +422,7 @@ export const useAppData = () => {
     await supabase.from("change_events").insert({
       clan_id: activeClanId,
       actor_id: currentUser.id,
-      actor_name: currentUser.name,
+      actor_name: actorLabel,
       target_type: "person",
       target_id: personId,
       action: "delete",
@@ -504,7 +434,7 @@ export const useAppData = () => {
         id: crypto.randomUUID(),
         clanId: activeClanId,
         actorId: currentUser.id,
-        actorName: currentUser.name,
+        actorName: actorLabel,
         targetType: "person",
         targetId: personId,
         action: "delete",
@@ -539,7 +469,7 @@ export const useAppData = () => {
           id: crypto.randomUUID(),
           clanId: activeClanId,
           actorId: currentUser.id,
-          actorName: currentUser.name,
+          actorName: actorLabel,
           targetType: "person",
           targetId: person.id,
           action: "create",
@@ -577,7 +507,7 @@ export const useAppData = () => {
     await supabase.from("change_events").insert({
       clan_id: activeClanId,
       actor_id: currentUser.id,
-      actor_name: currentUser.name,
+      actor_name: actorLabel,
       target_type: "person",
       target_id: nextPerson.id,
       action: "create",
@@ -589,7 +519,7 @@ export const useAppData = () => {
         id: crypto.randomUUID(),
         clanId: activeClanId,
         actorId: currentUser.id,
-        actorName: currentUser.name,
+        actorName: actorLabel,
         targetType: "person",
         targetId: nextPerson.id,
         action: "create",
@@ -653,7 +583,7 @@ export const useAppData = () => {
           id: crypto.randomUUID(),
           clanId: activeClanId,
           actorId: currentUser.id,
-          actorName: currentUser.name,
+          actorName: actorLabel,
           targetType: "relationship",
           targetId: relationship.id,
           action: "create",
@@ -683,7 +613,7 @@ export const useAppData = () => {
     await client.from("change_events").insert({
       clan_id: activeClanId,
       actor_id: currentUser.id,
-      actor_name: currentUser.name,
+      actor_name: actorLabel,
       target_type: "relationship",
       target_id: nextRel.id,
       action: "create",
@@ -695,7 +625,7 @@ export const useAppData = () => {
         id: crypto.randomUUID(),
         clanId: activeClanId,
         actorId: currentUser.id,
-        actorName: currentUser.name,
+        actorName: actorLabel,
         targetType: "relationship",
         targetId: nextRel.id,
         action: "create",
@@ -734,7 +664,7 @@ export const useAppData = () => {
           id: crypto.randomUUID(),
           clanId: activeClanId,
           actorId: currentUser.id,
-          actorName: currentUser.name,
+          actorName: actorLabel,
           targetType: "relationship",
           targetId: relationshipId,
           action: "delete",
@@ -768,7 +698,7 @@ export const useAppData = () => {
     await supabase.from("change_events").insert({
       clan_id: activeClanId,
       actor_id: currentUser.id,
-      actor_name: currentUser.name,
+      actor_name: actorLabel,
       target_type: "relationship",
       target_id: relationshipId,
       action: "delete",
@@ -780,7 +710,7 @@ export const useAppData = () => {
         id: crypto.randomUUID(),
         clanId: activeClanId,
         actorId: currentUser.id,
-        actorName: currentUser.name,
+        actorName: actorLabel,
         targetType: "relationship",
         targetId: relationshipId,
         action: "delete",
@@ -798,7 +728,6 @@ export const useAppData = () => {
       setPersons((prev) => prev.filter((person) => person.clanId !== activeClanId));
       setRelationships((prev) => prev.filter((rel) => rel.clanId !== activeClanId));
       setPositions((prev) => prev.filter((pos) => pos.clanId !== activeClanId));
-      setSuggestions((prev) => prev.filter((item) => item.clanId !== activeClanId));
       setChangeEvents((prev) => prev.filter((item) => item.clanId !== activeClanId));
       setSelectedPersonId("");
       return { error: "" };
@@ -830,69 +759,9 @@ export const useAppData = () => {
     setPersons((prev) => prev.filter((person) => person.clanId !== activeClanId));
     setRelationships((prev) => prev.filter((rel) => rel.clanId !== activeClanId));
     setPositions((prev) => prev.filter((pos) => pos.clanId !== activeClanId));
-    setSuggestions((prev) => prev.filter((item) => item.clanId !== activeClanId));
     setChangeEvents((prev) => prev.filter((item) => item.clanId !== activeClanId));
     setSelectedPersonId("");
     return { error: "" };
-  };
-
-  const approveSuggestion = async (suggestionId: string) => {
-    const suggestion = suggestions.find((item) => item.id === suggestionId);
-    if (!suggestion || suggestion.targetType !== "person" || !suggestion.targetId) {
-      return;
-    }
-
-    if (isSupabaseEnabled && supabase) {
-      await supabase
-        .from("suggestions")
-        .update({
-          status: "approved",
-          reviewed_by: currentUser.id,
-          reviewed_at: new Date().toISOString(),
-        })
-        .eq("id", suggestionId);
-    }
-
-    setSuggestions((prev) =>
-      prev.map((item) =>
-        item.id === suggestionId
-          ? {
-              ...item,
-              status: "approved",
-              reviewedBy: currentUser.id,
-              reviewedAt: new Date().toISOString(),
-            }
-          : item
-      )
-    );
-
-    await applyPersonUpdate(suggestion.targetId, suggestion.payload);
-  };
-
-  const rejectSuggestion = async (suggestionId: string) => {
-    if (isSupabaseEnabled && supabase) {
-      await supabase
-        .from("suggestions")
-        .update({
-          status: "rejected",
-          reviewed_by: currentUser.id,
-          reviewed_at: new Date().toISOString(),
-        })
-        .eq("id", suggestionId);
-    }
-
-    setSuggestions((prev) =>
-      prev.map((item) =>
-        item.id === suggestionId
-          ? {
-              ...item,
-              status: "rejected",
-              reviewedBy: currentUser.id,
-              reviewedAt: new Date().toISOString(),
-            }
-          : item
-      )
-    );
   };
 
   const updateManualPosition = async (personId: string, x: number, y: number) => {
@@ -913,7 +782,7 @@ export const useAppData = () => {
     await supabase.from("change_events").insert({
       clan_id: activeClanId,
       actor_id: currentUser.id,
-      actor_name: currentUser.name,
+      actor_name: actorLabel,
       target_type: "position",
       target_id: personId,
       action: "update",
@@ -1294,13 +1163,6 @@ export const useAppData = () => {
       setPositions((positionRows ?? []).map(mapPositionRow));
 
       if (!isGuest) {
-        const { data: suggestionRows } = await client
-          .from("suggestions")
-          .select("*")
-          .eq("clan_id", activeClanId)
-          .order("created_at", { ascending: false });
-        setSuggestions((suggestionRows ?? []).map(mapSuggestionRow));
-
         const { data: eventRows } = await client
           .from("change_events")
           .select("*")
@@ -1308,7 +1170,6 @@ export const useAppData = () => {
           .order("created_at", { ascending: false });
         setChangeEvents((eventRows ?? []).map(mapChangeEventRow));
       } else {
-        setSuggestions([]);
         setChangeEvents([]);
       }
     };
@@ -1340,7 +1201,6 @@ export const useAppData = () => {
     clanPersons,
     clanRelationships,
     clanPositions,
-    clanSuggestions,
     clanEvents,
     membership,
     isAdmin,
@@ -1349,9 +1209,6 @@ export const useAppData = () => {
     signInWithEmail,
     signOut,
     inviteAdmin,
-    createSuggestion,
-    approveSuggestion,
-    rejectSuggestion,
     applyPersonUpdate,
     deletePerson,
     createPerson,

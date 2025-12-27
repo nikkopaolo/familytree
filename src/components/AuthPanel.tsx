@@ -2,12 +2,13 @@
 
 import { useState } from "react";
 import { LogIn, LogOut, ShieldCheck } from "lucide-react";
-import type { UserProfile } from "@/lib/types";
+import type { MembershipRole, UserProfile } from "@/lib/types";
 
 type AuthPanelProps = {
   isSupabaseEnabled: boolean;
   isGuest: boolean;
   currentUser: UserProfile;
+  role?: MembershipRole;
   onSignIn: (email: string) => Promise<{ error?: string }>;
   onSignOut: () => Promise<void>;
   adminBootstrapError?: string;
@@ -17,6 +18,7 @@ export const AuthPanel = ({
   isSupabaseEnabled,
   isGuest,
   currentUser,
+  role,
   onSignIn,
   onSignOut,
   adminBootstrapError,
@@ -55,11 +57,21 @@ export const AuthPanel = ({
         <h3 className="text-xl text-slate-900">Access Control</h3>
         <span className="inline-flex items-center gap-2 rounded-full bg-emerald-50 px-3 py-1 text-xs font-semibold text-emerald-700">
           <ShieldCheck size={14} />
-          {isGuest ? "Viewer" : "Signed In"}
+          {isGuest
+            ? "Viewer"
+            : role === "admin"
+              ? "Clan Admin"
+              : role === "member"
+                ? "Member"
+                : "Viewer"}
         </span>
       </div>
       <p className="mt-2 text-sm text-slate-600">
-        Sign in to edit members, manage branches, and upload photos.
+        {isGuest
+          ? "You can browse the tree without signing in. Sign in with an invited email to edit."
+          : role
+            ? "You can edit members, manage branches, and upload photos."
+            : "Signed in, but not invited yet. Ask a clan admin to invite you for editing access."}
       </p>
       <div className="mt-4 space-y-3 text-sm">
         {isGuest ? (

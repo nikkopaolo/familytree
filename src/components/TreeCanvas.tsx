@@ -20,14 +20,9 @@ type TreeCanvasProps = {
   positions: PersonPosition[];
   manualPositions: Record<string, { x: number; y: number }>;
   canEditPerson: (person: Person) => boolean;
-  canSuggest: boolean;
   onAddChild: (parentId: string) => void;
   onAddPartner: (personId: string) => void;
-  onUpdatePerson: (
-    personId: string,
-    payload: Record<string, unknown>,
-    email?: string
-  ) => Promise<void> | void;
+  onUpdatePerson: (personId: string, payload: Record<string, unknown>) => Promise<void> | void;
   onDeleteRelationship: (relationshipId: string) => void;
   onLinkParent: (childId: string, parentId: string) => void;
   onLinkChild: (parentId: string, childId: string) => void;
@@ -57,7 +52,6 @@ export const TreeCanvas = ({
   positions,
   manualPositions,
   canEditPerson,
-  canSuggest,
   onAddChild,
   onAddPartner,
   onUpdatePerson,
@@ -330,11 +324,9 @@ export const TreeCanvas = ({
           stats,
           links,
           canEdit: canEditPerson(person),
-          canSuggest,
           onAddChild: () => onAddChild(person.id),
           onAddPartner: () => onAddPartner(person.id),
-          onUpdate: (payload: Record<string, unknown>, email?: string) =>
-            onUpdatePerson(person.id, payload, email),
+          onUpdate: (payload: Record<string, unknown>) => onUpdatePerson(person.id, payload),
           onDeleteRelationship,
           onLinkParent: (parentId: string) => onLinkParent(person.id, parentId),
           onLinkChild: (childId: string) => onLinkChild(person.id, childId),
@@ -347,7 +339,6 @@ export const TreeCanvas = ({
     relationshipStats,
     relationshipDetails,
     canEditPerson,
-    canSuggest,
     onAddChild,
     onAddPartner,
     onUpdatePerson,

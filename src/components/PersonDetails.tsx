@@ -11,8 +11,7 @@ type PersonDetailsProps = {
   persons: Person[];
   relationships: Relationship[];
   canEdit: boolean;
-  canSuggest: boolean;
-  onSubmitUpdate: (payload: Record<string, unknown>, email?: string) => void;
+  onSubmitUpdate: (payload: Record<string, unknown>) => void;
   onAddParentChild: (parentId: string, childId: string) => void;
   onAddPartner: (personId: string, partnerId: string) => void;
   onDelete?: (personId: string) => void;
@@ -25,7 +24,6 @@ export const PersonDetails = ({
   persons,
   relationships,
   canEdit,
-  canSuggest,
   onSubmitUpdate,
   onAddParentChild,
   onAddPartner,
@@ -34,7 +32,6 @@ export const PersonDetails = ({
   onUploadPhoto,
 }: PersonDetailsProps) => {
   const [openForm, setOpenForm] = useState(false);
-  const [email, setEmail] = useState("");
   const [photoMessage, setPhotoMessage] = useState("");
   const [selectedParentId, setSelectedParentId] = useState("");
   const [selectedChildId, setSelectedChildId] = useState("");
@@ -53,30 +50,30 @@ export const PersonDetails = ({
 
   const relationshipSummary = useMemo(() => {
     if (!personId) {
-    return {
-      parents: [] as Person[],
-      children: [] as Person[],
-      partners: [] as Person[],
-      siblings: [] as Person[],
-      auntsUncles: [] as Person[],
-      niecesNephews: [] as Person[],
-      eligibleParents: [] as Person[],
-      eligibleChildren: [] as Person[],
-      eligiblePartners: [] as Person[],
-    };
-  }
+      return {
+        parents: [] as Person[],
+        children: [] as Person[],
+        partners: [] as Person[],
+        siblings: [] as Person[],
+        auntsUncles: [] as Person[],
+        niecesNephews: [] as Person[],
+        eligibleParents: [] as Person[],
+        eligibleChildren: [] as Person[],
+        eligiblePartners: [] as Person[],
+      };
+    }
 
-  const parentLinks = relationships.filter(
-    (rel) => rel.relationshipType === "parent" && rel.childId === personId
-  );
-  const childLinks = relationships.filter(
-    (rel) => rel.relationshipType === "parent" && rel.parentId === personId
-  );
-  const partnerLinks = relationships.filter(
-    (rel) =>
-      rel.relationshipType === "partner" &&
-      (rel.parentId === personId || rel.childId === personId)
-  );
+    const parentLinks = relationships.filter(
+      (rel) => rel.relationshipType === "parent" && rel.childId === personId
+    );
+    const childLinks = relationships.filter(
+      (rel) => rel.relationshipType === "parent" && rel.parentId === personId
+    );
+    const partnerLinks = relationships.filter(
+      (rel) =>
+        rel.relationshipType === "partner" &&
+        (rel.parentId === personId || rel.childId === personId)
+    );
 
     const parents = parentLinks
       .map((rel) => persons.find((p) => p.id === rel.parentId))
@@ -179,11 +176,6 @@ export const PersonDetails = ({
     });
   }, [person]);
 
-  useEffect(() => {
-    if (!canSuggest) {
-      setOpenForm(false);
-    }
-  }, [canSuggest, personId]);
 
   if (!person) {
     return (
@@ -207,7 +199,7 @@ export const PersonDetails = ({
         location: formState.location,
       },
     };
-    onSubmitUpdate(payload, email || undefined);
+    onSubmitUpdate(payload);
     setOpenForm(false);
   };
 
@@ -253,13 +245,13 @@ export const PersonDetails = ({
           </p>
         </div>
         <div className="flex flex-wrap items-center gap-2">
-          {canSuggest && (
+          {canEdit && (
             <button
               className="inline-flex items-center gap-2 rounded-full border border-slate-200 bg-white px-3 py-2 text-xs font-semibold text-slate-600"
               onClick={() => setOpenForm((prev) => !prev)}
             >
               <Edit3 size={14} />
-              {canEdit ? "Update" : "Suggest edit"}
+              Update
             </button>
           )}
           {canEdit && onDelete && (
@@ -515,10 +507,10 @@ export const PersonDetails = ({
         </div>
       </div>
 
-      {openForm && canSuggest && (
+      {openForm && canEdit && (
         <div className="mt-6 rounded-2xl border border-slate-200 bg-white p-4">
           <p className="text-xs font-semibold uppercase tracking-[0.2em] text-slate-500">
-            {canEdit ? "Direct Update" : "Suggest Update"}
+            Direct Update
           </p>
           <div className="mt-3 space-y-3 text-sm">
             <label className="block">
@@ -606,22 +598,12 @@ export const PersonDetails = ({
                 }
               />
             </label>
-            {!canEdit && (
-              <label className="block">
-                <span className="text-xs text-slate-500">Your email (optional)</span>
-                <input
-                  className="mt-1 w-full rounded-xl border border-slate-200 px-3 py-2"
-                  value={email}
-                  onChange={(event) => setEmail(event.target.value)}
-                />
-              </label>
-            )}
             <button
               className="inline-flex items-center gap-2 rounded-full bg-amber-500 px-4 py-2 text-xs font-semibold text-white"
               onClick={handleSubmit}
             >
               <Send size={14} />
-              {canEdit ? "Save update" : "Submit suggestion"}
+              Save update
             </button>
           </div>
         </div>

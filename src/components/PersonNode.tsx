@@ -24,10 +24,9 @@ type PersonNodeData = {
     eligiblePartners: Person[];
   };
   canEdit: boolean;
-  canSuggest: boolean;
   onAddChild: () => void;
   onAddPartner: () => void;
-  onUpdate: (payload: Record<string, unknown>, email?: string) => Promise<void> | void;
+  onUpdate: (payload: Record<string, unknown>) => Promise<void> | void;
   onDeleteRelationship: (relationshipId: string) => void;
   onLinkParent: (parentId: string) => void;
   onLinkChild: (childId: string) => void;
@@ -74,7 +73,6 @@ export const PersonNode = ({ data, selected }: NodeProps<PersonNodeData>) => {
     stats,
     links,
     canEdit,
-    canSuggest,
     onAddChild,
     onAddPartner,
     onUpdate,
@@ -112,7 +110,6 @@ export const PersonNode = ({ data, selected }: NodeProps<PersonNodeData>) => {
     childId: "",
     partnerId: "",
   });
-  const [suggestEmail, setSuggestEmail] = useState("");
 
   useEffect(() => {
     if (isEditing) return;
@@ -138,20 +135,12 @@ export const PersonNode = ({ data, selected }: NodeProps<PersonNodeData>) => {
   useEffect(() => {
     setIsEditing(false);
     setIsSaving(false);
-    setSuggestEmail("");
     setLinkState({ parentId: "", childId: "", partnerId: "" });
   }, [person.id]);
 
-  useEffect(() => {
-    if (!canSuggest) {
-      setIsEditing(false);
-    }
-  }, [canSuggest]);
-
   const startEditing = (event: MouseEvent<HTMLButtonElement>) => {
     event.stopPropagation();
-    if (!canSuggest) return;
-    setSuggestEmail("");
+    if (!canEdit) return;
     setFormState({
       fullName: person.fullName,
       birthDate: person.birthDate ?? "",
@@ -181,8 +170,7 @@ export const PersonNode = ({ data, selected }: NodeProps<PersonNodeData>) => {
         gender: formState.gender || null,
         location: locationValue || null,
         isAlive: formState.isAlive,
-      },
-      suggestEmail.trim() || undefined
+      }
     );
     setIsSaving(false);
     setIsEditing(false);
@@ -299,13 +287,13 @@ export const PersonNode = ({ data, selected }: NodeProps<PersonNodeData>) => {
               >
                 {statusLabel}
               </span>
-              {canSuggest && (
+              {canEdit && (
                 <button
                   className="rounded-full border border-slate-200 bg-white p-1 text-slate-500 transition hover:text-slate-800"
                   onClick={startEditing}
                   type="button"
-                  aria-label={canEdit ? "Edit member" : "Suggest edit"}
-                  title={canEdit ? "Edit member" : "Suggest edit"}
+                  aria-label="Edit member"
+                  title="Edit member"
                 >
                   <Edit3 size={12} />
                 </button>
@@ -417,19 +405,6 @@ export const PersonNode = ({ data, selected }: NodeProps<PersonNodeData>) => {
               onMouseDown={(event) => event.stopPropagation()}
             />
           </label>
-          {!canEdit && (
-            <label className="block">
-              <span className="text-[10px] font-semibold uppercase tracking-[0.2em] text-slate-400">
-                Your email (optional)
-              </span>
-              <input
-                className="mt-1 w-full rounded-xl border border-slate-200 px-3 py-1 text-xs"
-                value={suggestEmail}
-                onChange={(event) => setSuggestEmail(event.target.value)}
-                onMouseDown={(event) => event.stopPropagation()}
-              />
-            </label>
-          )}
           <div className="flex gap-2">
             <button
               className="inline-flex items-center gap-1 rounded-full bg-amber-500 px-3 py-1 text-[11px] font-semibold text-white disabled:opacity-60"
@@ -439,7 +414,7 @@ export const PersonNode = ({ data, selected }: NodeProps<PersonNodeData>) => {
               type="button"
             >
               <Check size={12} />
-              {canEdit ? "Save" : "Suggest"}
+              Save
             </button>
             <button
               className="inline-flex items-center gap-1 rounded-full border border-slate-200 px-3 py-1 text-[11px] font-semibold text-slate-600"
@@ -484,7 +459,7 @@ export const PersonNode = ({ data, selected }: NodeProps<PersonNodeData>) => {
                 ) : (
                   <p className="mt-1 text-xs text-slate-400">No parents linked.</p>
                 )}
-                {canEdit && canSuggest && (
+                {canEdit && (
                   <div className="mt-2 flex gap-2">
                     <select
                       className="w-full rounded-lg border border-slate-200 px-2 py-1 text-xs"
@@ -541,7 +516,7 @@ export const PersonNode = ({ data, selected }: NodeProps<PersonNodeData>) => {
                 ) : (
                   <p className="mt-1 text-xs text-slate-400">No children linked.</p>
                 )}
-                {canEdit && canSuggest && (
+                {canEdit && (
                   <div className="mt-2 flex gap-2">
                     <select
                       className="w-full rounded-lg border border-slate-200 px-2 py-1 text-xs"
@@ -598,7 +573,7 @@ export const PersonNode = ({ data, selected }: NodeProps<PersonNodeData>) => {
                 ) : (
                   <p className="mt-1 text-xs text-slate-400">No partners linked.</p>
                 )}
-                {canEdit && canSuggest && (
+                {canEdit && (
                   <div className="mt-2 flex gap-2">
                     <select
                       className="w-full rounded-lg border border-slate-200 px-2 py-1 text-xs"

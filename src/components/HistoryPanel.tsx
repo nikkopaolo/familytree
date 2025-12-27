@@ -24,10 +24,10 @@ export const HistoryPanel = ({ events, persons }: HistoryPanelProps) => {
             <div className="flex flex-wrap items-center justify-between gap-3">
               <div>
                 <p className="text-sm font-semibold text-slate-900">
-                  {event.actorName ?? "System"} · {event.action.toUpperCase()}
+                  {event.actorName ?? "System"} - {event.action.toUpperCase()}
                 </p>
                 <p className="text-xs text-slate-500">
-                  {formatDate(event.createdAt)} · {event.targetType} ·{" "}
+                  {formatDate(event.createdAt)} - {event.targetType} -{" "}
                   {event.targetType === "person"
                     ? findPersonName(persons, event.targetId)
                     : event.targetId ?? "Unknown"}

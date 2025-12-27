@@ -7,7 +7,6 @@ import { MembersTable } from "@/components/MembersTable";
 import { AuthPanel } from "@/components/AuthPanel";
 import { PersonDetails } from "@/components/PersonDetails";
 import { StatsPanel } from "@/components/StatsPanel";
-import { SuggestionsPanel } from "@/components/SuggestionsPanel";
 import { TabNav, type AppTab } from "@/components/TabNav";
 import { TopBar } from "@/components/TopBar";
 import { TreeCanvas } from "@/components/TreeCanvas";
@@ -27,15 +26,10 @@ export default function Home() {
     clanPersons,
     clanRelationships,
     clanPositions,
-    clanSuggestions,
     clanEvents,
     membership,
     isAdmin,
-    branchRootIds,
     canEditPerson,
-    createSuggestion,
-    approveSuggestion,
-    rejectSuggestion,
     applyPersonUpdate,
     deletePerson,
     uploadPersonPhoto,
@@ -70,9 +64,14 @@ export default function Home() {
     }
   }, [clanPersons, rootId]);
 
+  useEffect(() => {
+    if (activeTab === "suggestions") {
+      setActiveTab("tree");
+    }
+  }, [activeTab]);
+
   const selectedPerson = clanPersons.find((person) => person.id === selectedPersonId);
   const addChildParent = clanPersons.find((person) => person.id === addChildParentId);
-  const canSuggest = Boolean(membership);
   const canDeleteSelected = selectedPerson ? canEditPerson(selectedPerson) : false;
 
   const addChildPartners = useMemo(() => {
@@ -90,44 +89,23 @@ export default function Home() {
       .filter(Boolean) as typeof clanPersons;
   }, [addChildParentId, clanRelationships, clanPersons]);
 
-  const handleSubmitUpdate = async (payload: Record<string, unknown>, email?: string) => {
+  const handleSubmitUpdate = async (payload: Record<string, unknown>) => {
     if (!selectedPerson) return;
     if (canEditPerson(selectedPerson)) {
       await applyPersonUpdate(selectedPerson.id, payload);
       return;
     }
-    await createSuggestion({
-      clanId: activeClanId,
-      targetId: selectedPerson.id,
-      payload,
-      creatorEmail: email,
-    });
+    window.alert("Editing requires an invite with edit access.");
   };
 
-  const handleInlineUpdate = async (
-    personId: string,
-    payload: Record<string, unknown>,
-    email?: string
-  ) => {
+  const handleInlineUpdate = async (personId: string, payload: Record<string, unknown>) => {
     const person = clanPersons.find((item) => item.id === personId);
     if (!person) return;
     if (canEditPerson(person)) {
       await applyPersonUpdate(person.id, payload);
       return;
     }
-    await createSuggestion({
-      clanId: activeClanId,
-      targetId: person.id,
-      payload,
-      creatorEmail: email,
-    });
-  };
-
-  const canApprove = (personId?: string) => {
-    if (isAdmin) return true;
-    const person = clanPersons.find((item) => item.id === personId);
-    if (!person) return false;
-    return branchRootIds.has(person.branchRootId);
+    window.alert("Editing requires an invite with edit access.");
   };
 
   const quickStats = useMemo(() => {
@@ -171,7 +149,7 @@ export default function Home() {
           createPerson({ fullName: "New Member" });
         }}
       />
-      <TabNav activeTab={activeTab} onChange={setActiveTab} />
+      <TabNav activeTab={activeTab} onChange={setActiveTab} showSuggestions={false} />
       <div className="mx-auto mt-6 grid w-[min(1200px,94vw)] grid-cols-1 gap-6 xl:grid-cols-[minmax(0,1fr)_320px]">
         <section className="flex flex-col gap-6">
           <div className="grid gap-4 md:grid-cols-3">
@@ -191,7 +169,6 @@ export default function Home() {
               positions={clanPositions}
               manualPositions={manualPositions}
               canEditPerson={canEditPerson}
-              canSuggest={canSuggest}
               onAddChild={(parentId) => setAddChildParentId(parentId)}
               onAddPartner={async (personId) => {
                 const newPerson = await createPerson({ fullName: "New Member" });
@@ -249,21 +226,13 @@ export default function Home() {
           )}
           {activeTab === "stats" && <StatsPanel persons={clanPersons} />}
           {activeTab === "history" && <HistoryPanel events={clanEvents} persons={clanPersons} />}
-          {activeTab === "suggestions" && (
-            <SuggestionsPanel
-              suggestions={clanSuggestions}
-              persons={clanPersons}
-              canApprove={canApprove}
-              onApprove={approveSuggestion}
-              onReject={rejectSuggestion}
-            />
-          )}
         </section>
         <div className="flex flex-col gap-6">
           <AuthPanel
             isSupabaseEnabled={isSupabaseEnabled}
             isGuest={isGuest}
             currentUser={currentUser}
+            role={membership?.role}
             onSignIn={signInWithEmail}
             onSignOut={signOut}
             adminBootstrapError={adminBootstrapError}
@@ -274,7 +243,6 @@ export default function Home() {
             persons={clanPersons}
             relationships={clanRelationships}
             canEdit={selectedPerson ? canEditPerson(selectedPerson) : false}
-            canSuggest={canSuggest}
             onSubmitUpdate={handleSubmitUpdate}
             onAddParentChild={(parentId, childId) => createParentChildRelationship(parentId, childId)}
             onAddPartner={(personId, partnerId) => createPartnerRelationship(personId, partnerId)}
