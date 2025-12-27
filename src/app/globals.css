@@ -54,8 +54,16 @@ h4 {
 }
 
 .graph-grid {
-  background-image: radial-gradient(rgba(31, 41, 51, 0.08) 1px, transparent 1px);
-  background-size: 22px 22px;
+  background-image:
+    repeating-linear-gradient(
+      to bottom,
+      rgba(241, 179, 76, 0.08) 0,
+      rgba(241, 179, 76, 0.08) 120px,
+      transparent 120px,
+      transparent 240px
+    ),
+    radial-gradient(rgba(31, 41, 51, 0.08) 1px, transparent 1px);
+  background-size: auto, 22px 22px;
 }
 
 .react-flow__node-person {
@@ -63,4 +71,29 @@ h4 {
   border: 1px solid rgba(31, 41, 51, 0.2);
   box-shadow: 0 10px 24px rgba(31, 41, 51, 0.12);
   background: #fffaf1;
+}
+
+.family-node {
+  position: relative;
+  width: 12px;
+  height: 12px;
+  border-radius: 999px;
+  background: rgba(241, 179, 76, 0.9);
+  border: 2px solid rgba(124, 45, 18, 0.25);
+  box-shadow: 0 2px 8px rgba(31, 41, 51, 0.15);
+}
+
+.react-flow__edge.edge-parent .react-flow__edge-text,
+.react-flow__edge.edge-parent .react-flow__edge-textbg,
+.react-flow__edge.edge-sibling .react-flow__edge-text,
+.react-flow__edge.edge-sibling .react-flow__edge-textbg {
+  opacity: 0;
+  transition: opacity 0.2s ease;
+}
+
+.react-flow__edge.edge-parent:hover .react-flow__edge-text,
+.react-flow__edge.edge-parent:hover .react-flow__edge-textbg,
+.react-flow__edge.edge-sibling:hover .react-flow__edge-text,
+.react-flow__edge.edge-sibling:hover .react-flow__edge-textbg {
+  opacity: 1;
 }

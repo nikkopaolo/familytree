@@ -14,7 +14,7 @@ import {
 } from "recharts";
 import type { Person } from "@/lib/types";
 import { calculateAge } from "@/lib/utils";
-import { parseISO, getMonth, isValid } from "date-fns";
+import { getMonth, isValid, parseISO } from "date-fns";
 
 type StatsPanelProps = {
   persons: Person[];
@@ -64,6 +64,7 @@ export const StatsPanel = ({ persons }: StatsPanelProps) => {
       return { bucket: bucket.label, count: total };
     });
   }, [persons]);
+
 
   return (
     <section className="grid gap-6 lg:grid-cols-[1fr_1.2fr]">

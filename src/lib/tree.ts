@@ -2,8 +2,9 @@ import dagre from "dagre";
 import type { Edge, Node } from "reactflow";
 import type { Person, Relationship, PersonPosition } from "./types";
 
-const NODE_WIDTH = 230;
-const NODE_HEIGHT = 110;
+const NODE_WIDTH = 280;
+const NODE_HEIGHT = 170;
+const FAMILY_NODE_SIZE = 12;
 
 export type TreeLayoutDirection = "TB" | "LR";
 
@@ -21,16 +22,27 @@ export const filterTree = (
   relationships: Relationship[],
   filter: TreeFilter
 ) => {
+  if (filter.rootId === "all") {
+    return {
+      filteredPersons: persons,
+      filteredRelationships: relationships.filter(
+        (rel) =>
+          rel.relationshipType === "parent" || rel.relationshipType === "partner"
+      ),
+    };
+  }
   const personMap = new Map(persons.map((person) => [person.id, person]));
   const adjacency = new Map<string, string[]>();
+  const addAdjacency = (fromId: string, toId: string) => {
+    if (!adjacency.has(fromId)) adjacency.set(fromId, []);
+    adjacency.get(fromId)?.push(toId);
+  };
 
   relationships
     .filter((rel) => rel.relationshipType === "parent")
     .forEach((rel) => {
-      if (!adjacency.has(rel.parentId)) adjacency.set(rel.parentId, []);
-      if (!adjacency.has(rel.childId)) adjacency.set(rel.childId, []);
-      adjacency.get(rel.parentId)?.push(rel.childId);
-      adjacency.get(rel.childId)?.push(rel.parentId);
+      addAdjacency(rel.parentId, rel.childId);
+      addAdjacency(rel.childId, rel.parentId);
     });
 
   const selected = new Set<string>();
@@ -53,13 +65,23 @@ export const filterTree = (
     }
   }
 
-  const filteredPersons = persons.filter((person) => selected.has(person.id));
+  const partnerIds = new Set<string>();
+  relationships
+    .filter((rel) => rel.relationshipType === "partner")
+    .forEach((rel) => {
+      if (selected.has(rel.parentId)) partnerIds.add(rel.childId);
+      if (selected.has(rel.childId)) partnerIds.add(rel.parentId);
+    });
+  partnerIds.forEach((id) => selected.add(id));
+
   const filteredRelationships = relationships.filter(
     (rel) =>
-      rel.relationshipType === "parent" &&
+      (rel.relationshipType === "parent" || rel.relationshipType === "partner") &&
       selected.has(rel.parentId) &&
       selected.has(rel.childId)
   );
+
+  const filteredPersons = persons.filter((person) => selected.has(person.id));
 
   return { filteredPersons, filteredRelationships };
 };
@@ -79,21 +101,91 @@ export const buildTreeGraph = ({
 }) => {
   const graph = new dagre.graphlib.Graph();
   graph.setDefaultEdgeLabel(() => ({}));
-  graph.setGraph({ rankdir: direction, nodesep: 40, ranksep: 90 });
+  graph.setGraph({ rankdir: direction, nodesep: 60, ranksep: 130 });
 
   persons.forEach((person) => {
     graph.setNode(person.id, { width: NODE_WIDTH, height: NODE_HEIGHT });
   });
 
-  relationships
-    .filter((rel) => rel.relationshipType === "parent")
-    .forEach((rel) => {
-      graph.setEdge(rel.parentId, rel.childId);
+  const parentLinks = relationships.filter(
+    (rel) => rel.relationshipType === "parent"
+  );
+  const partnerLinks = relationships.filter(
+    (rel) => rel.relationshipType === "partner"
+  );
+
+  const normalizePair = (left: string, right: string) =>
+    left < right ? `${left}|${right}` : `${right}|${left}`;
+  const partnerPairMap = new Map<string, Relationship>();
+  partnerLinks.forEach((rel) => {
+    partnerPairMap.set(normalizePair(rel.parentId, rel.childId), rel);
+  });
+
+  const parentsByChild = new Map<string, string[]>();
+  parentLinks.forEach((rel) => {
+    const list = parentsByChild.get(rel.childId) ?? [];
+    list.push(rel.parentId);
+    parentsByChild.set(rel.childId, list);
+  });
+
+  const familyGroups = new Map<
+    string,
+    { id: string; parentA: string; parentB: string; children: Set<string> }
+  >();
+  const familyParentChildPairs = new Set<string>();
+
+  parentsByChild.forEach((parentIds, childId) => {
+    if (parentIds.length < 2) return;
+    let pair: [string, string] | null = null;
+    for (let i = 0; i < parentIds.length && !pair; i += 1) {
+      for (let j = i + 1; j < parentIds.length; j += 1) {
+        const key = normalizePair(parentIds[i], parentIds[j]);
+        if (partnerPairMap.has(key)) {
+          pair = [parentIds[i], parentIds[j]];
+          break;
+        }
+      }
+    }
+    if (!pair) return;
+    const pairKey = normalizePair(pair[0], pair[1]);
+    const existing = familyGroups.get(pairKey);
+    if (existing) {
+      existing.children.add(childId);
+    } else {
+      familyGroups.set(pairKey, {
+        id: `family:${pairKey}`,
+        parentA: pair[0],
+        parentB: pair[1],
+        children: new Set([childId]),
+      });
+    }
+    familyParentChildPairs.add(`${pair[0]}|${childId}`);
+    familyParentChildPairs.add(`${pair[1]}|${childId}`);
+  });
+
+  familyGroups.forEach((group) => {
+    graph.setNode(group.id, { width: FAMILY_NODE_SIZE, height: FAMILY_NODE_SIZE });
+    graph.setEdge(group.parentA, group.id, { weight: 0.6, minlen: 1 });
+    graph.setEdge(group.parentB, group.id, { weight: 0.6, minlen: 1 });
+    group.children.forEach((childId) => {
+      graph.setEdge(group.id, childId, { weight: 1, minlen: 1 });
     });
+  });
+
+  parentLinks.forEach((rel) => {
+    if (familyParentChildPairs.has(`${rel.parentId}|${rel.childId}`)) return;
+    graph.setEdge(rel.parentId, rel.childId, { weight: 1, minlen: 1 });
+  });
+  partnerLinks.forEach((rel) => {
+    graph.setEdge(rel.parentId, rel.childId, { weight: 0.2, minlen: 1 });
+  });
 
   dagre.layout(graph);
 
   const storedPositions = buildPositionMap(positions);
+
+  const resolvedPositions = new Map<string, { x: number; y: number }>();
+  const resolvedCenters = new Map<string, { x: number; y: number }>();
 
   const nodes: Node[] = persons.map((person) => {
     const layoutPosition = graph.node(person.id) ?? { x: 0, y: 0 };
@@ -104,6 +196,11 @@ export const buildTreeGraph = ({
       y: layoutPosition.y - NODE_HEIGHT / 2,
     };
     const position = manual ?? stored ?? layoutTopLeft;
+    resolvedPositions.set(person.id, position);
+    resolvedCenters.set(person.id, {
+      x: position.x + NODE_WIDTH / 2,
+      y: position.y + NODE_HEIGHT / 2,
+    });
 
     return {
       id: person.id,
@@ -112,17 +209,224 @@ export const buildTreeGraph = ({
       position,
     };
   });
+  const familyNodes: Node[] = Array.from(familyGroups.values()).map((group) => {
+    const layoutPosition = graph.node(group.id) ?? { x: 0, y: 0 };
+    const layoutTopLeft = {
+      x: layoutPosition.x - FAMILY_NODE_SIZE / 2,
+      y: layoutPosition.y - FAMILY_NODE_SIZE / 2,
+    };
+    const parentCenters = [group.parentA, group.parentB]
+      .map((id) => resolvedCenters.get(id))
+      .filter(Boolean) as Array<{ x: number; y: number }>;
+    const childCenters = Array.from(group.children)
+      .map((id) => resolvedCenters.get(id))
+      .filter(Boolean) as Array<{ x: number; y: number }>;
+    let centerX = layoutPosition.x;
+    let centerY = layoutPosition.y;
+    if (parentCenters.length > 0) {
+      const avgX =
+        parentCenters.reduce((acc, item) => acc + item.x, 0) / parentCenters.length;
+      const avgY =
+        parentCenters.reduce((acc, item) => acc + item.y, 0) / parentCenters.length;
+      const maxParentY = Math.max(...parentCenters.map((item) => item.y));
+      const maxParentX = Math.max(...parentCenters.map((item) => item.x));
+      const minChildY = childCenters.length
+        ? Math.min(...childCenters.map((item) => item.y))
+        : maxParentY + 48;
+      const minChildX = childCenters.length
+        ? Math.min(...childCenters.map((item) => item.x))
+        : maxParentX + 48;
 
-  const edges: Edge[] = relationships
-    .filter((rel) => rel.relationshipType === "parent")
+      if (direction === "TB") {
+        const gap = Math.max(16, Math.min(48, (minChildY - maxParentY) / 2));
+        centerX = avgX;
+        centerY = maxParentY + gap;
+      } else {
+        const gap = Math.max(16, Math.min(48, (minChildX - maxParentX) / 2));
+        centerX = maxParentX + gap;
+        centerY = avgY;
+      }
+    }
+
+    return {
+      id: group.id,
+      type: "family",
+      data: {
+        parents: [group.parentA, group.parentB],
+        children: Array.from(group.children),
+        direction,
+      },
+      position: {
+        x: centerX - FAMILY_NODE_SIZE / 2,
+        y: centerY - FAMILY_NODE_SIZE / 2,
+      },
+      draggable: false,
+      selectable: false,
+      connectable: false,
+      focusable: false,
+    };
+  });
+
+  const labelStyle = {
+    fill: "rgba(31, 41, 51, 0.75)",
+    fontSize: 10,
+    fontWeight: 600,
+  };
+  const parentSourceHandle = direction === "LR" ? "parent-right" : "parent-bottom";
+  const parentTargetHandle = direction === "LR" ? "parent-left" : "parent-top";
+
+  const getPartnerHandles = (sourceId: string, targetId: string) => {
+    const sourceCenter = resolvedCenters.get(sourceId);
+    const targetCenter = resolvedCenters.get(targetId);
+    if (!sourceCenter || !targetCenter) {
+      return direction === "LR"
+        ? { sourceHandle: "partner-bottom", targetHandle: "partner-top" }
+        : { sourceHandle: "partner-right", targetHandle: "partner-left" };
+    }
+    if (direction === "LR") {
+      const sourceAbove = sourceCenter.y <= targetCenter.y;
+      return {
+        sourceHandle: sourceAbove ? "partner-bottom" : "partner-top",
+        targetHandle: sourceAbove ? "partner-top" : "partner-bottom",
+      };
+    }
+    const sourceLeft = sourceCenter.x <= targetCenter.x;
+    return {
+      sourceHandle: sourceLeft ? "partner-right" : "partner-left",
+      targetHandle: sourceLeft ? "partner-left" : "partner-right",
+    };
+  };
+
+  const parentEdges = parentLinks
+    .filter((rel) => !familyParentChildPairs.has(`${rel.parentId}|${rel.childId}`))
     .map((rel) => ({
       id: rel.id,
       source: rel.parentId,
       target: rel.childId,
-      type: "smoothstep",
+      sourceHandle: parentSourceHandle,
+      targetHandle: parentTargetHandle,
+      type: "step",
       animated: false,
-      style: { stroke: "rgba(31, 41, 51, 0.5)", strokeWidth: 2 },
+      label: "Parent of",
+      labelStyle,
+      labelBgStyle: { fill: "rgba(255, 250, 241, 0.9)" },
+      labelBgPadding: [6, 3],
+      labelBgBorderRadius: 8,
+      className: "edge-parent",
+      style: { stroke: "rgba(31, 41, 51, 0.7)", strokeWidth: 2.5 },
     }));
 
-  return { nodes, edges };
+  const partnerEdges = partnerLinks.map((rel) => ({
+    id: rel.id,
+    source: rel.parentId,
+    target: rel.childId,
+    ...getPartnerHandles(rel.parentId, rel.childId),
+    type: "smoothstep",
+    animated: false,
+    label: "Partner of",
+    labelStyle,
+    labelBgStyle: { fill: "rgba(255, 250, 241, 0.9)" },
+    labelBgPadding: [6, 3],
+    labelBgBorderRadius: 8,
+    className: "edge-partner",
+    style: {
+      stroke: "rgba(234, 179, 8, 0.7)",
+      strokeWidth: 2.5,
+      strokeDasharray: "6 4",
+    },
+  }));
+
+  const familyConnectorEdges: Edge[] = [];
+  const familyEdges: Edge[] = [];
+  const siblingEdges: Edge[] = [];
+  const siblingLabelStyle = {
+    fill: "rgba(22, 101, 52, 0.75)",
+    fontSize: 10,
+    fontWeight: 600,
+  };
+
+  familyGroups.forEach((group) => {
+    familyConnectorEdges.push({
+      id: `${group.parentA}->${group.id}`,
+      source: group.parentA,
+      target: group.id,
+      sourceHandle: parentSourceHandle,
+      type: "step",
+      animated: false,
+      className: "edge-parent",
+      style: { stroke: "rgba(31, 41, 51, 0.7)", strokeWidth: 2.5 },
+    });
+    familyConnectorEdges.push({
+      id: `${group.parentB}->${group.id}`,
+      source: group.parentB,
+      target: group.id,
+      sourceHandle: parentSourceHandle,
+      type: "step",
+      animated: false,
+      className: "edge-parent",
+      style: { stroke: "rgba(31, 41, 51, 0.7)", strokeWidth: 2.5 },
+    });
+    group.children.forEach((childId) => {
+      familyEdges.push({
+        id: `${group.id}->${childId}`,
+        source: group.id,
+        target: childId,
+        targetHandle: parentTargetHandle,
+        type: "step",
+        animated: false,
+        label: "Child of",
+        labelStyle,
+        labelBgStyle: { fill: "rgba(255, 250, 241, 0.9)" },
+        labelBgPadding: [6, 3],
+        labelBgBorderRadius: 8,
+        className: "edge-parent",
+        style: { stroke: "rgba(31, 41, 51, 0.7)", strokeWidth: 2.5 },
+      });
+    });
+
+    const children = Array.from(group.children);
+    if (children.length > 1) {
+      const sorted = children
+        .map((childId) => ({
+          id: childId,
+          x: resolvedCenters.get(childId)?.x ?? graph.node(childId)?.x ?? 0,
+        }))
+        .sort((a, b) => a.x - b.x)
+        .map((item) => item.id);
+
+      for (let i = 0; i < sorted.length - 1; i += 1) {
+        const source = sorted[i];
+        const target = sorted[i + 1];
+        siblingEdges.push({
+          id: `sibling:${source}:${target}`,
+          source,
+          target,
+          type: "straight",
+          animated: false,
+          label: "Sibling of",
+          labelStyle: siblingLabelStyle,
+          labelBgStyle: { fill: "rgba(240, 253, 244, 0.9)" },
+          labelBgPadding: [6, 3],
+          labelBgBorderRadius: 8,
+          className: "edge-sibling",
+          style: {
+            stroke: "rgba(22, 101, 52, 0.45)",
+            strokeWidth: 2,
+            strokeDasharray: "4 4",
+          },
+        });
+      }
+    }
+  });
+
+  return {
+    nodes: [...nodes, ...familyNodes],
+    edges: [
+      ...parentEdges,
+      ...familyConnectorEdges,
+      ...familyEdges,
+      ...partnerEdges,
+      ...siblingEdges,
+    ],
+  };
 };

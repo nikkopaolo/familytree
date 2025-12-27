@@ -1,9 +1,10 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import ReactFlow, { Background, Controls, MiniMap, Node } from "reactflow";
 import "reactflow/dist/style.css";
 import { PersonNode } from "./PersonNode";
+import { FamilyNode } from "./FamilyNode";
 import { buildTreeGraph, filterTree, TreeLayoutDirection } from "@/lib/tree";
 import type { Person, PersonPosition, Relationship } from "@/lib/types";
 
@@ -15,6 +16,11 @@ type TreeCanvasProps = {
   canEditPerson: (person: Person) => boolean;
   onAddChild: (parentId: string) => void;
   onAddPartner: (personId: string) => void;
+  onUpdatePerson: (
+    personId: string,
+    payload: Record<string, unknown>,
+    email?: string
+  ) => Promise<void> | void;
   onUpdatePosition: (id: string, x: number, y: number) => void;
   selectedPersonId: string;
   onSelectPerson: (id: string) => void;
@@ -26,7 +32,7 @@ type TreeCanvasProps = {
   onMaxNodesChange: (value: number) => void;
 };
 
-const nodeTypes = { person: PersonNode };
+const nodeTypes = { person: PersonNode, family: FamilyNode };
 
 export const TreeCanvas = ({
   persons,
@@ -36,6 +42,7 @@ export const TreeCanvas = ({
   canEditPerson,
   onAddChild,
   onAddPartner,
+  onUpdatePerson,
   onUpdatePosition,
   selectedPersonId,
   onSelectPerson,
@@ -47,7 +54,17 @@ export const TreeCanvas = ({
   onMaxNodesChange,
 }: TreeCanvasProps) => {
   const [direction, setDirection] = useState<TreeLayoutDirection>("TB");
+  const [isFullscreen, setIsFullscreen] = useState(false);
   const hasPeople = persons.length > 0;
+
+  useEffect(() => {
+    if (!isFullscreen) return;
+    const previousOverflow = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    return () => {
+      document.body.style.overflow = previousOverflow;
+    };
+  }, [isFullscreen]);
 
   const { filteredPersons, filteredRelationships } = useMemo(() => {
     if (!hasPeople) {
@@ -81,20 +98,86 @@ export const TreeCanvas = ({
     })) as Node[];
   }, [nodes, selectedPersonId]);
 
+  const relationshipStats = useMemo(() => {
+    const parentsMap = new Map<string, Set<string>>();
+    const childrenMap = new Map<string, Set<string>>();
+    const partnersMap = new Map<string, Set<string>>();
+    const siblingsMap = new Map<string, Set<string>>();
+
+    persons.forEach((person) => {
+      parentsMap.set(person.id, new Set());
+      childrenMap.set(person.id, new Set());
+      partnersMap.set(person.id, new Set());
+      siblingsMap.set(person.id, new Set());
+    });
+
+    relationships.forEach((rel) => {
+      if (rel.relationshipType === "parent") {
+        parentsMap.get(rel.childId)?.add(rel.parentId);
+        childrenMap.get(rel.parentId)?.add(rel.childId);
+      }
+      if (rel.relationshipType === "partner") {
+        partnersMap.get(rel.parentId)?.add(rel.childId);
+        partnersMap.get(rel.childId)?.add(rel.parentId);
+      }
+    });
+
+    parentsMap.forEach((parentIds, childId) => {
+      parentIds.forEach((parentId) => {
+        childrenMap.get(parentId)?.forEach((siblingId) => {
+          if (siblingId !== childId) {
+            siblingsMap.get(childId)?.add(siblingId);
+          }
+        });
+      });
+    });
+
+    return new Map(
+      persons.map((person) => [
+        person.id,
+        {
+          parents: parentsMap.get(person.id)?.size ?? 0,
+          children: childrenMap.get(person.id)?.size ?? 0,
+          partners: partnersMap.get(person.id)?.size ?? 0,
+          siblings: siblingsMap.get(person.id)?.size ?? 0,
+        },
+      ])
+    );
+  }, [persons, relationships]);
+
   const interactiveNodes = useMemo(() => {
     return nodeHighlight.map((node) => {
+      if (node.type !== "person") {
+        return node;
+      }
       const person = node.data as Person;
+      const stats = relationshipStats.get(person.id) ?? {
+        parents: 0,
+        children: 0,
+        partners: 0,
+        siblings: 0,
+      };
       return {
         ...node,
         data: {
           person,
+          stats,
           canEdit: canEditPerson(person),
           onAddChild: () => onAddChild(person.id),
           onAddPartner: () => onAddPartner(person.id),
+          onUpdate: (payload: Record<string, unknown>, email?: string) =>
+            onUpdatePerson(person.id, payload, email),
         },
       };
     });
-  }, [nodeHighlight, canEditPerson, onAddChild, onAddPartner]);
+  }, [
+    nodeHighlight,
+    relationshipStats,
+    canEditPerson,
+    onAddChild,
+    onAddPartner,
+    onUpdatePerson,
+  ]);
 
   if (!hasPeople) {
     return (
@@ -121,8 +204,12 @@ export const TreeCanvas = ({
     );
   }
 
+  const containerClass = isFullscreen
+    ? "glass-card fixed inset-4 z-50 flex h-[calc(100vh-2rem)] flex-col gap-4 rounded-3xl p-4"
+    : "glass-card flex h-[640px] flex-col gap-4 rounded-3xl p-4";
+
   return (
-    <section className="glass-card flex h-[640px] flex-col gap-4 rounded-3xl p-4">
+    <section className={containerClass}>
       <div className="flex flex-wrap items-center gap-4">
         <div>
           <p className="text-xs font-semibold uppercase tracking-[0.2em] text-slate-500">
@@ -133,6 +220,7 @@ export const TreeCanvas = ({
             value={rootId}
             onChange={(event) => onRootChange(event.target.value)}
           >
+            <option value="all">All members</option>
             {persons.map((person) => (
               <option key={person.id} value={person.id}>
                 {person.fullName}
@@ -151,6 +239,7 @@ export const TreeCanvas = ({
             className="mt-2 w-32 rounded-2xl border border-slate-200 bg-white px-4 py-2 text-sm font-semibold text-slate-800"
             value={maxDepth}
             onChange={(event) => onMaxDepthChange(Number(event.target.value))}
+            disabled={rootId === "all"}
           />
         </div>
         <div>
@@ -164,6 +253,7 @@ export const TreeCanvas = ({
             className="mt-2 w-32 rounded-2xl border border-slate-200 bg-white px-4 py-2 text-sm font-semibold text-slate-800"
             value={maxNodes}
             onChange={(event) => onMaxNodesChange(Number(event.target.value))}
+            disabled={rootId === "all"}
           />
         </div>
         <div>
@@ -193,8 +283,17 @@ export const TreeCanvas = ({
             </button>
           </div>
         </div>
-        <div className="ml-auto rounded-2xl bg-white px-4 py-2 text-sm text-slate-600 shadow-sm">
-          Showing {filteredPersons.length} people - {filteredRelationships.length} links
+        <div className="ml-auto flex flex-wrap items-center gap-3">
+          <button
+            className="rounded-full border border-slate-200 bg-white px-4 py-2 text-xs font-semibold text-slate-600 shadow-sm transition hover:text-slate-900"
+            onClick={() => setIsFullscreen((prev) => !prev)}
+            type="button"
+          >
+            {isFullscreen ? "Exit full screen" : "Full screen"}
+          </button>
+          <div className="rounded-2xl bg-white px-4 py-2 text-sm text-slate-600 shadow-sm">
+            Showing {filteredPersons.length} people - {filteredRelationships.length} links
+          </div>
         </div>
       </div>
       <div className="graph-grid relative h-full w-full overflow-hidden rounded-3xl border border-slate-200 bg-white/70">
@@ -203,8 +302,16 @@ export const TreeCanvas = ({
           edges={edges}
           nodeTypes={nodeTypes}
           fitView
-          onNodeClick={(_, node) => onSelectPerson(node.id)}
-          onNodeDragStop={(_, node) => onUpdatePosition(node.id, node.position.x, node.position.y)}
+          onNodeClick={(_, node) => {
+            if (node.type === "person") {
+              onSelectPerson(node.id);
+            }
+          }}
+          onNodeDragStop={(_, node) => {
+            if (node.type === "person") {
+              onUpdatePosition(node.id, node.position.x, node.position.y);
+            }
+          }}
         >
           <MiniMap
             pannable

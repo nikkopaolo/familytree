@@ -5,8 +5,6 @@ import type { Clan, MembershipRole, UserProfile } from "@/lib/types";
 
 type TopBarProps = {
   clans: Clan[];
-  activeClanId: string;
-  onClanChange: (value: string) => void;
   role?: MembershipRole;
   user: UserProfile;
   onAddMember?: () => void;
@@ -20,13 +18,12 @@ const roleLabel = (role?: MembershipRole) => {
 
 export const TopBar = ({
   clans,
-  activeClanId,
-  onClanChange,
   role,
   user,
   onAddMember,
   onInviteAdmin,
 }: TopBarProps) => {
+  const activeClanName = clans[0]?.name ?? "Katigbak";
   return (
     <header className="glass-card sticky top-4 z-20 mx-auto mt-4 flex w-[min(1200px,94vw)] flex-col gap-4 rounded-3xl px-6 py-5 md:flex-row md:items-center md:justify-between">
       <div className="flex flex-col gap-2">
@@ -40,27 +37,13 @@ export const TopBar = ({
           </span>
         </div>
         <div>
-          <h1 className="text-3xl text-slate-900">Family Governance Hub</h1>
+          <h1 className="text-3xl text-slate-900">Katigbak Family Tree</h1>
           <p className="text-sm text-slate-600">
-            Manage branches, approvals, and the living history of each clan.
+            Living history and connections for the {activeClanName} family.
           </p>
         </div>
       </div>
       <div className="flex flex-wrap items-center gap-3">
-        <label className="text-xs font-semibold uppercase tracking-[0.2em] text-slate-500">
-          Active Clan
-          <select
-            className="mt-2 w-full rounded-2xl border border-slate-200 bg-white px-4 py-2 text-sm font-medium text-slate-900 shadow-sm focus:border-amber-400 focus:outline-none"
-            value={activeClanId}
-            onChange={(event) => onClanChange(event.target.value)}
-          >
-            {clans.map((clan) => (
-              <option key={clan.id} value={clan.id}>
-                {clan.name}
-              </option>
-            ))}
-          </select>
-        </label>
         <div className="flex items-center gap-2 rounded-2xl bg-white px-4 py-2 text-sm text-slate-700 shadow-sm">
           <div className="flex size-9 items-center justify-center rounded-xl bg-slate-100 text-sm font-semibold text-slate-600">
             {user.name.slice(0, 2).toUpperCase()}

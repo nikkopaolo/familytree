@@ -11,6 +11,8 @@ import { SuggestionsPanel } from "@/components/SuggestionsPanel";
 import { TabNav, type AppTab } from "@/components/TabNav";
 import { TopBar } from "@/components/TopBar";
 import { TreeCanvas } from "@/components/TreeCanvas";
+import { UpcomingBirthdays } from "@/components/UpcomingBirthdays";
+import { AddChildDialog } from "@/components/AddChildDialog";
 import { useAppData } from "@/lib/useAppData";
 import { calculateAge } from "@/lib/utils";
 
@@ -35,6 +37,7 @@ export default function Home() {
     approveSuggestion,
     rejectSuggestion,
     applyPersonUpdate,
+    deletePerson,
     uploadPersonPhoto,
     signInWithEmail,
     signOut,
@@ -55,6 +58,7 @@ export default function Home() {
   const [rootId, setRootId] = useState("");
   const [maxDepth, setMaxDepth] = useState(4);
   const [maxNodes, setMaxNodes] = useState(40);
+  const [addChildParentId, setAddChildParentId] = useState<string>("");
 
   useEffect(() => {
     if (clanPersons.length > 0 && !rootId) {
@@ -63,6 +67,22 @@ export default function Home() {
   }, [clanPersons, rootId]);
 
   const selectedPerson = clanPersons.find((person) => person.id === selectedPersonId);
+  const addChildParent = clanPersons.find((person) => person.id === addChildParentId);
+
+  const addChildPartners = useMemo(() => {
+    if (!addChildParentId) return [];
+    return clanRelationships
+      .filter(
+        (rel) =>
+          rel.relationshipType === "partner" &&
+          (rel.parentId === addChildParentId || rel.childId === addChildParentId)
+      )
+      .map((rel) =>
+        rel.parentId === addChildParentId ? rel.childId : rel.parentId
+      )
+      .map((partnerId) => clanPersons.find((person) => person.id === partnerId))
+      .filter(Boolean) as typeof clanPersons;
+  }, [addChildParentId, clanRelationships, clanPersons]);
 
   const handleSubmitUpdate = async (payload: Record<string, unknown>, email?: string) => {
     if (!selectedPerson) return;
@@ -73,6 +93,25 @@ export default function Home() {
     await createSuggestion({
       clanId: activeClanId,
       targetId: selectedPerson.id,
+      payload,
+      creatorEmail: email,
+    });
+  };
+
+  const handleInlineUpdate = async (
+    personId: string,
+    payload: Record<string, unknown>,
+    email?: string
+  ) => {
+    const person = clanPersons.find((item) => item.id === personId);
+    if (!person) return;
+    if (canEditPerson(person)) {
+      await applyPersonUpdate(person.id, payload);
+      return;
+    }
+    await createSuggestion({
+      clanId: activeClanId,
+      targetId: person.id,
       payload,
       creatorEmail: email,
     });
@@ -110,12 +149,6 @@ export default function Home() {
     <main className="pb-16">
       <TopBar
         clans={clans}
-        activeClanId={activeClanId}
-        onClanChange={(value) => {
-          setActiveClanId(value);
-          setRootId("");
-          setSelectedPersonId("");
-        }}
         role={membership?.role}
         user={currentUser}
         onInviteAdmin={async () => {
@@ -152,13 +185,7 @@ export default function Home() {
               positions={clanPositions}
               manualPositions={manualPositions}
               canEditPerson={canEditPerson}
-              onAddChild={async (parentId) => {
-                const newPerson = await createPerson({ fullName: "New Member" });
-                if (newPerson) {
-                  await createParentChildRelationship(parentId, newPerson.id);
-                  setSelectedPersonId(newPerson.id);
-                }
-              }}
+              onAddChild={(parentId) => setAddChildParentId(parentId)}
               onAddPartner={async (personId) => {
                 const newPerson = await createPerson({ fullName: "New Member" });
                 if (newPerson) {
@@ -166,6 +193,7 @@ export default function Home() {
                   setSelectedPersonId(newPerson.id);
                 }
               }}
+              onUpdatePerson={handleInlineUpdate}
               onUpdatePosition={updateManualPosition}
               selectedPersonId={selectedPersonId}
               onSelectPerson={setSelectedPersonId}
@@ -209,6 +237,7 @@ export default function Home() {
             onSignOut={signOut}
             adminBootstrapError={adminBootstrapError}
           />
+          <UpcomingBirthdays persons={clanPersons} />
           <PersonDetails
             person={selectedPerson}
             persons={clanPersons}
@@ -217,6 +246,7 @@ export default function Home() {
             onSubmitUpdate={handleSubmitUpdate}
             onAddParentChild={(parentId, childId) => createParentChildRelationship(parentId, childId)}
             onAddPartner={(personId, partnerId) => createPartnerRelationship(personId, partnerId)}
+            onDelete={deletePerson}
             canUploadPhoto={Boolean(selectedPerson && canEditPerson(selectedPerson) && isSupabaseEnabled && !isGuest)}
             onUploadPhoto={
               selectedPerson
@@ -226,6 +256,26 @@ export default function Home() {
           />
         </div>
       </div>
+      <AddChildDialog
+        isOpen={Boolean(addChildParentId)}
+        parent={addChildParent}
+        partners={addChildPartners}
+        onClose={() => setAddChildParentId("")}
+        onConfirm={async ({ fullName, partnerIds }) => {
+          if (!addChildParentId) return;
+          const newPerson = await createPerson({
+            fullName: fullName.trim() || "New Member",
+          });
+          if (newPerson) {
+            await createParentChildRelationship(addChildParentId, newPerson.id);
+            for (const partnerId of partnerIds) {
+              await createParentChildRelationship(partnerId, newPerson.id);
+            }
+            setSelectedPersonId(newPerson.id);
+          }
+          setAddChildParentId("");
+        }}
+      />
     </main>
   );
 }

@@ -3,7 +3,13 @@
 import { useRef, useState } from "react";
 import { Download, UploadCloud } from "lucide-react";
 import type { Person, Relationship } from "@/lib/types";
-import { exportPeopleCsv, exportTreeJson, parsePeopleCsv } from "@/lib/importExport";
+import {
+  exportGedcom,
+  exportPeopleCsv,
+  exportTreeJson,
+  parseGedcom,
+  parsePeopleCsv,
+} from "@/lib/importExport";
 
 type ImportExportPanelProps = {
   persons: Person[];
@@ -31,6 +37,11 @@ export const ImportExportPanel = ({
     downloadFile(json, "family-tree.json", "application/json");
   };
 
+  const handleExportGedcom = () => {
+    const gedcom = exportGedcom(persons, relationships);
+    downloadFile(gedcom, "family-tree.ged", "text/plain");
+  };
+
   const handleImport = async (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
     if (!file) return;
@@ -51,14 +62,21 @@ export const ImportExportPanel = ({
       setMessage("CSV imported. New members added as standalone branches.");
       return;
     }
-    setMessage("Unsupported file format. Use CSV or JSON.");
+    if (file.name.endsWith(".ged") || file.name.endsWith(".gedcom")) {
+      const parsed = parseGedcom(text);
+      onImportJson(parsed);
+      setMessage("GEDCOM imported. Relationships preserved.");
+      return;
+    }
+    setMessage("Unsupported file format. Use CSV, JSON, or GEDCOM.");
   };
 
   return (
     <section className="glass-card rounded-3xl p-6">
       <h3 className="text-xl text-slate-900">Import & Export</h3>
       <p className="text-sm text-slate-600">
-        Export CSV for member lists or JSON for a full tree backup. Import supports both.
+        Export CSV for member lists (relationships not included), JSON for a full tree backup,
+        or GEDCOM for genealogy tools. Import supports all three formats.
       </p>
       <div className="mt-4 flex flex-wrap gap-3">
         <button
@@ -77,6 +95,13 @@ export const ImportExportPanel = ({
         </button>
         <button
           className="inline-flex items-center gap-2 rounded-full border border-slate-200 bg-white px-4 py-2 text-xs font-semibold text-slate-700"
+          onClick={handleExportGedcom}
+        >
+          <Download size={14} />
+          Export GEDCOM
+        </button>
+        <button
+          className="inline-flex items-center gap-2 rounded-full border border-slate-200 bg-white px-4 py-2 text-xs font-semibold text-slate-700"
           onClick={() => fileInputRef.current?.click()}
         >
           <UploadCloud size={14} />
@@ -86,7 +111,7 @@ export const ImportExportPanel = ({
           type="file"
           ref={fileInputRef}
           className="hidden"
-          accept=".csv,.json"
+          accept=".csv,.json,.ged,.gedcom"
           onChange={handleImport}
         />
       </div>

@@ -342,6 +342,81 @@ export const useAppData = () => {
     ]);
   };
 
+  const deletePerson = async (personId: string) => {
+    const target = persons.find((person) => person.id === personId);
+    if (!target) return;
+    const updatedRelationships = relationships.filter(
+      (rel) => rel.parentId !== personId && rel.childId !== personId
+    );
+    const updatedPositions = positions.filter((pos) => pos.personId !== personId);
+
+    setPersons((prev) => prev.filter((person) => person.id !== personId));
+    setRelationships(updatedRelationships);
+    setPositions(updatedPositions);
+    setManualPositions((prev) => {
+      const { [personId]: _, ...rest } = prev;
+      return rest;
+    });
+    setSelectedPersonId((prev) => (prev === personId ? "" : prev));
+
+    const diff = [{ field: "fullName", before: target.fullName, after: "-" }];
+
+    if (!isSupabaseEnabled || !supabase) {
+      setChangeEvents((prev) => [
+        {
+          id: crypto.randomUUID(),
+          clanId: activeClanId,
+          actorId: currentUser.id,
+          actorName: currentUser.name,
+          targetType: "person",
+          targetId: personId,
+          action: "delete",
+          diff,
+          createdAt: new Date().toISOString(),
+        },
+        ...prev,
+      ]);
+      return;
+    }
+
+    await supabase
+      .from("relationships")
+      .delete()
+      .eq("clan_id", activeClanId)
+      .or(`parent_id.eq.${personId},child_id.eq.${personId}`);
+    await supabase
+      .from("person_positions")
+      .delete()
+      .eq("clan_id", activeClanId)
+      .eq("person_id", personId);
+    await supabase.from("persons").delete().eq("id", personId);
+
+    await supabase.from("change_events").insert({
+      clan_id: activeClanId,
+      actor_id: currentUser.id,
+      actor_name: currentUser.name,
+      target_type: "person",
+      target_id: personId,
+      action: "delete",
+      diff,
+    });
+
+    setChangeEvents((prev) => [
+      {
+        id: crypto.randomUUID(),
+        clanId: activeClanId,
+        actorId: currentUser.id,
+        actorName: currentUser.name,
+        targetType: "person",
+        targetId: personId,
+        action: "delete",
+        diff,
+        createdAt: new Date().toISOString(),
+      },
+      ...prev,
+    ]);
+  };
+
   const createPerson = async (payload?: Partial<Person>) => {
     const id = crypto.randomUUID();
     const person: Person = {
@@ -928,6 +1003,7 @@ export const useAppData = () => {
     approveSuggestion,
     rejectSuggestion,
     applyPersonUpdate,
+    deletePerson,
     createPerson,
     createParentChildRelationship,
     createPartnerRelationship,
