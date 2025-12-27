@@ -214,6 +214,14 @@ export const useAppData = () => {
 
   const isSupabaseEnabled = Boolean(isSupabaseConfigured && supabase);
 
+  useEffect(() => {
+    if (!isSupabaseEnabled) return;
+    const storedId = getStoredClanId();
+    if (storedId && isUuid(storedId) && storedId !== activeClanId) {
+      setActiveClanId(storedId);
+    }
+  }, [isSupabaseEnabled]);
+
   const membership = useMemo(
     () => memberships.find((item) => item.clanId === activeClanId),
     [activeClanId, memberships]
@@ -1153,9 +1161,16 @@ export const useAppData = () => {
   const loadClans = async (preferredMemberships: Membership[] = memberships) => {
     const client = supabase;
     if (!isSupabaseEnabled || !client) return;
-    const { data: clanRows } = await client
+    const { data: clanRows, error } = await client
       .from("clans")
       .select("id, name, slug, description, is_public");
+    if (error) {
+      const storedId = getStoredClanId();
+      setActiveClanId((prev) =>
+        resolveActiveClanId([], preferredMemberships, prev, storedId)
+      );
+      return;
+    }
     if (clanRows && clanRows.length > 0) {
       const mapped = (clanRows ?? []).map((row: any) => ({
         id: row.id,
@@ -1213,6 +1228,9 @@ export const useAppData = () => {
         membershipsList = await fetchMemberships();
       }
       setMemberships(membershipsList);
+      if (membershipsList.length > 0 && !isUuid(activeClanId)) {
+        setActiveClanId(membershipsList[0]?.clanId ?? "");
+      }
       await loadClans(membershipsList);
 
       const { data: ownersRows } = await client
@@ -1243,8 +1261,18 @@ export const useAppData = () => {
   }, [isSupabaseEnabled, currentUser.id]);
 
   useEffect(() => {
+    if (!isSupabaseEnabled) return;
+    if (isUuid(activeClanId)) return;
+    const membershipClanId = memberships[0]?.clanId;
+    if (membershipClanId && isUuid(membershipClanId)) {
+      setActiveClanId(membershipClanId);
+    }
+  }, [isSupabaseEnabled, memberships, activeClanId]);
+
+  useEffect(() => {
     const client = supabase;
     if (!isSupabaseEnabled || !client || !activeClanId) return;
+    if (!isUuid(activeClanId)) return;
 
     const loadClanData = async () => {
       const { data: personRows } = await client

@@ -171,7 +171,7 @@ alter table public.change_events enable row level security;
 
 create policy "clans_select_members"
 on public.clans for select
-using (public.is_clan_member(id) or public.is_clan_public(id));
+using (public.is_clan_member(id) or is_public = true);
 
 create policy "clans_insert_self"
 on public.clans for insert
