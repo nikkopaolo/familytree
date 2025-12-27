@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import {
   Bar,
   BarChart,
@@ -45,6 +45,10 @@ export const StatsPanel = ({ persons, relationships = [] }: StatsPanelProps) => 
   const aliveCount = persons.filter((person) => person.isAlive).length;
   const deceasedCount = persons.length - aliveCount;
   const [selectedMonth, setSelectedMonth] = useState<number | null>(null);
+  const [selectedStatus, setSelectedStatus] = useState<"alive" | "deceased" | null>(null);
+  const [selectedLocation, setSelectedLocation] = useState<string | null>(null);
+  const [familyPage, setFamilyPage] = useState(1);
+  const familyPageSize = 5;
 
   const aliveBreakdown = [
     { name: "Alive", value: aliveCount },
@@ -181,46 +185,96 @@ export const StatsPanel = ({ persons, relationships = [] }: StatsPanelProps) => 
       .map(([location, count]) => ({ location, count }));
   }, [persons]);
 
+  const locationPeople = useMemo(() => {
+    if (!selectedLocation) return [];
+    return persons
+      .filter((person) => person.stats?.location?.trim() === selectedLocation)
+      .slice()
+      .sort((a, b) => a.fullName.localeCompare(b.fullName));
+  }, [persons, selectedLocation]);
+
   const dataCompleteness = useMemo(() => {
-    const total = persons.length;
     const missingBirth = persons.filter((person) => !person.birthDate).length;
     const missingLocation = persons.filter((person) => !person.stats?.location).length;
     const missingGender = persons.filter((person) => !person.gender).length;
-    return { total, missingBirth, missingLocation, missingGender };
+    return { missingBirth, missingLocation, missingGender };
   }, [persons]);
 
-  const familySizeStats = useMemo(() => {
+  const familyUnits = useMemo(() => {
     const parentLinks = relationships.filter((rel) => rel.relationshipType === "parent");
-    if (parentLinks.length === 0) {
-      return { avgChildren: null, medianChildren: null, topParents: [] as Array<{ name: string; count: number }> };
-    }
-    const childrenMap = new Map<string, Set<string>>();
+    if (parentLinks.length === 0) return [];
+    const childToParents = new Map<string, Set<string>>();
     parentLinks.forEach((rel) => {
-      if (!childrenMap.has(rel.parentId)) {
-        childrenMap.set(rel.parentId, new Set());
+      if (!childToParents.has(rel.childId)) {
+        childToParents.set(rel.childId, new Set());
       }
-      childrenMap.get(rel.parentId)?.add(rel.childId);
+      childToParents.get(rel.childId)?.add(rel.parentId);
     });
-    const childCounts = Array.from(childrenMap.values()).map((set) => set.size);
-    const avgChildren =
-      childCounts.length > 0
-        ? childCounts.reduce((sum, value) => sum + value, 0) / childCounts.length
-        : null;
-    const topParents = Array.from(childrenMap.entries())
-      .map(([parentId, set]) => {
-        const parent = persons.find((person) => person.id === parentId);
-        return { name: parent?.fullName ?? "Unknown member", count: set.size };
-      })
-      .sort((a, b) => b.count - a.count)
-      .slice(0, 5);
 
-    return {
-      avgChildren,
-      medianChildren: medianValue(childCounts),
-      topParents,
-    };
+    const families = new Map<
+      string,
+      { parentIds: string[]; childIds: Set<string> }
+    >();
+
+    childToParents.forEach((parentSet, childId) => {
+      const parentIds = Array.from(parentSet);
+      if (parentIds.length === 0) return;
+      parentIds.sort();
+      const key = parentIds.join("|");
+      if (!families.has(key)) {
+        families.set(key, { parentIds, childIds: new Set() });
+      }
+      families.get(key)?.childIds.add(childId);
+    });
+
+    return Array.from(families.values())
+      .map((entry) => {
+        const parentNames = entry.parentIds.map(
+          (parentId) =>
+            persons.find((person) => person.id === parentId)?.fullName ?? "Unknown member"
+        );
+        return {
+          label: parentNames.join(" & "),
+          count: entry.childIds.size,
+        };
+      })
+      .sort((a, b) => b.count - a.count);
   }, [persons, relationships]);
 
+  const familyStats = useMemo(() => {
+    const counts = familyUnits.map((entry) => entry.count);
+    const avgChildren =
+      counts.length > 0 ? counts.reduce((sum, value) => sum + value, 0) / counts.length : null;
+    return {
+      avgChildren,
+      medianChildren: counts.length > 0 ? medianValue(counts) : null,
+    };
+  }, [familyUnits]);
+
+  const totalFamilyPages = Math.max(1, Math.ceil(familyUnits.length / familyPageSize));
+
+  const familyPageItems = useMemo(() => {
+    const start = (familyPage - 1) * familyPageSize;
+    return familyUnits.slice(start, start + familyPageSize);
+  }, [familyPage, familyPageSize, familyUnits]);
+
+  const statusPeople = useMemo(() => {
+    if (!selectedStatus) return [];
+    return persons
+      .filter((person) => (selectedStatus === "alive" ? person.isAlive : !person.isAlive))
+      .slice()
+      .sort((a, b) => a.fullName.localeCompare(b.fullName));
+  }, [persons, selectedStatus]);
+
+  useEffect(() => {
+    setFamilyPage((prev) => Math.min(Math.max(1, prev), totalFamilyPages));
+  }, [totalFamilyPages]);
+  const handleStatusClick = (name?: string) => {
+    const next =
+      name === "Alive" ? "alive" : name === "Deceased" ? "deceased" : null;
+    if (!next) return;
+    setSelectedStatus((prev) => (prev === next ? null : next));
+  };
 
   return (
     <section className="grid gap-6">
@@ -246,6 +300,7 @@ export const StatsPanel = ({ persons, relationships = [] }: StatsPanelProps) => 
                       nameKey="name"
                       innerRadius={35}
                       outerRadius={60}
+                      onClick={(data) => handleStatusClick(data?.name)}
                     >
                       {aliveBreakdown.map((entry) => (
                         <Cell
@@ -305,79 +360,112 @@ export const StatsPanel = ({ persons, relationships = [] }: StatsPanelProps) => 
               </div>
             </div>
           </div>
-        </div>
-      </div>
-      <div className="glass-card rounded-3xl p-6">
-        <div className="flex flex-wrap items-center justify-between gap-3">
-          <div>
-            <h2 className="text-2xl text-slate-900">Birthdays Across the Year</h2>
-            <p className="text-sm text-slate-600">
-              Click a month to see members celebrating.
-            </p>
-          </div>
-          <button
-            className="rounded-full border border-slate-200 bg-white px-4 py-2 text-xs font-semibold text-slate-600"
-            onClick={() => setSelectedMonth(null)}
-            type="button"
-          >
-            Clear selection
-          </button>
-        </div>
-        <div className="mt-6 h-64">
-          <ResponsiveContainer width="100%" height="100%">
-            <BarChart data={birthsByMonth}>
-              <XAxis dataKey="monthLabel" fontSize={12} />
-              <YAxis allowDecimals={false} fontSize={12} />
-              <Tooltip />
-              <Bar
-                dataKey="count"
-                radius={[10, 10, 0, 0]}
-                onClick={(data) => setSelectedMonth(data?.monthIndex ?? null)}
+          <div className="rounded-2xl border border-slate-200 bg-white/80 p-4 text-sm text-slate-600">
+            <div className="flex items-center justify-between">
+              <p className="text-xs font-semibold uppercase tracking-[0.2em] text-slate-500">
+                Status list
+              </p>
+              <button
+                className="rounded-full border border-slate-200 bg-white px-3 py-1 text-xs font-semibold text-slate-600"
+                onClick={() => setSelectedStatus(null)}
+                type="button"
               >
-                {birthsByMonth.map((entry) => (
-                  <Cell
-                    key={entry.monthIndex}
-                    fill={selectedMonth === entry.monthIndex ? "#f08b32" : "#f1b34c"}
-                  />
-                ))}
-              </Bar>
-            </BarChart>
-          </ResponsiveContainer>
-        </div>
-        <div className="mt-6 rounded-2xl border border-slate-200 bg-white/80 p-4">
-          <p className="text-xs font-semibold uppercase tracking-[0.2em] text-slate-500">
-            {selectedMonth === null
-              ? "Select a month"
-              : `${new Date(0, selectedMonth).toLocaleString("en-US", {
-                  month: "long",
-                })} birthdays`}
-          </p>
-          {selectedMonth === null ? (
-            <p className="mt-2 text-sm text-slate-600">
-              Pick a bar to see members and stats for that month.
-            </p>
-          ) : (
-            <div className="mt-3 max-h-56 space-y-2 overflow-auto text-sm text-slate-700">
-              {selectedMonthPeople.length === 0 && (
-                <p className="text-sm text-slate-500">No birthdays for this month.</p>
-              )}
-              {selectedMonthPeople.map((entry) => {
-                const person = entry.person;
-                return (
-                  <div key={person.id} className="flex items-center justify-between gap-3">
+                Clear
+              </button>
+            </div>
+            {selectedStatus ? (
+              <div className="mt-3 max-h-40 space-y-2 overflow-auto">
+                {statusPeople.length === 0 && (
+                  <p className="text-sm text-slate-500">No members found.</p>
+                )}
+                {statusPeople.map((person) => (
+                  <div key={person.id} className="flex items-center justify-between">
                     <span className="font-semibold text-slate-800">{person.fullName}</span>
                     <span className="text-xs text-slate-500">
-                      Day {entry.day} - Age {calculateAge(person.birthDate, person.deathDate)} -
-                      {person.stats?.location ?? "Unknown"}
+                      Age {calculateAge(person.birthDate, person.deathDate)}
                     </span>
                   </div>
-                );
-              })}
+                ))}
+              </div>
+            ) : (
+              <p className="mt-2 text-sm text-slate-500">
+                Click Alive or Deceased on the chart to list members.
+              </p>
+            )}
+          </div>
+        </div>
+        <div className="glass-card rounded-3xl p-6">
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <div>
+              <h2 className="text-2xl text-slate-900">Birthdays Across the Year</h2>
+              <p className="text-sm text-slate-600">
+                Click a month to see members celebrating.
+              </p>
             </div>
-          )}
+            <button
+              className="rounded-full border border-slate-200 bg-white px-4 py-2 text-xs font-semibold text-slate-600"
+              onClick={() => setSelectedMonth(null)}
+              type="button"
+            >
+              Clear selection
+            </button>
+          </div>
+          <div className="mt-6 h-64">
+            <ResponsiveContainer width="100%" height="100%">
+              <BarChart data={birthsByMonth}>
+                <XAxis dataKey="monthLabel" fontSize={12} />
+                <YAxis allowDecimals={false} fontSize={12} />
+                <Tooltip />
+                <Bar
+                  dataKey="count"
+                  radius={[10, 10, 0, 0]}
+                  onClick={(data) => setSelectedMonth(data?.monthIndex ?? null)}
+                >
+                  {birthsByMonth.map((entry) => (
+                    <Cell
+                      key={entry.monthIndex}
+                      fill={selectedMonth === entry.monthIndex ? "#f08b32" : "#f1b34c"}
+                    />
+                  ))}
+                </Bar>
+              </BarChart>
+            </ResponsiveContainer>
+          </div>
+          <div className="mt-6 rounded-2xl border border-slate-200 bg-white/80 p-4">
+            <p className="text-xs font-semibold uppercase tracking-[0.2em] text-slate-500">
+              {selectedMonth === null
+                ? "Select a month"
+                : `${new Date(0, selectedMonth).toLocaleString("en-US", {
+                    month: "long",
+                  })} birthdays`}
+            </p>
+            {selectedMonth === null ? (
+              <p className="mt-2 text-sm text-slate-600">
+                Pick a bar to see members and stats for that month.
+              </p>
+            ) : (
+              <div className="mt-3 max-h-56 space-y-2 overflow-auto text-sm text-slate-700">
+                {selectedMonthPeople.length === 0 && (
+                  <p className="text-sm text-slate-500">No birthdays for this month.</p>
+                )}
+                {selectedMonthPeople.map((entry) => {
+                  const person = entry.person;
+                  return (
+                    <div key={person.id} className="flex items-center justify-between gap-3">
+                      <span className="font-semibold text-slate-800">{person.fullName}</span>
+                      <span className="text-xs text-slate-500">
+                        Day {entry.day} - Age {calculateAge(person.birthDate, person.deathDate)} -
+                        {person.stats?.location ?? "Unknown"}
+                      </span>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </div>
         </div>
       </div>
-      <div className="grid gap-6 lg:grid-cols-2">
+      <div className="grid gap-6 lg:grid-cols-[1.2fr_0.8fr]">
         <div className="glass-card rounded-3xl p-6">
           <h2 className="text-2xl text-slate-900">Births & Deaths by Decade</h2>
           <p className="text-sm text-slate-600">
@@ -432,20 +520,64 @@ export const StatsPanel = ({ persons, relationships = [] }: StatsPanelProps) => 
         </div>
         <div className="grid gap-6">
           <div className="glass-card rounded-3xl p-6">
-            <h2 className="text-2xl text-slate-900">Location Highlights</h2>
-            <p className="text-sm text-slate-600">Most common locations in the clan.</p>
+            <div className="flex items-center justify-between gap-3">
+              <div>
+                <h2 className="text-2xl text-slate-900">Location Highlights</h2>
+                <p className="text-sm text-slate-600">Most common locations in the clan.</p>
+              </div>
+              <button
+                className="rounded-full border border-slate-200 bg-white px-3 py-1 text-xs font-semibold text-slate-600"
+                onClick={() => setSelectedLocation(null)}
+                type="button"
+              >
+                Clear
+              </button>
+            </div>
             <div className="mt-4 space-y-2">
               {locationStats.length === 0 && (
                 <p className="text-sm text-slate-500">No locations recorded yet.</p>
               )}
               {locationStats.map((entry) => (
-                <div key={entry.location} className="flex items-center justify-between text-sm">
+                <button
+                  key={entry.location}
+                  className="flex w-full items-center justify-between rounded-xl border border-transparent px-2 py-2 text-left text-sm hover:border-amber-200 hover:bg-amber-50"
+                  onClick={() =>
+                    setSelectedLocation((prev) =>
+                      prev === entry.location ? null : entry.location
+                    )
+                  }
+                  type="button"
+                >
                   <span className="font-semibold text-slate-800">{entry.location}</span>
                   <span className="rounded-full bg-amber-100 px-3 py-1 text-xs font-semibold text-amber-700">
                     {entry.count}
                   </span>
-                </div>
+                </button>
               ))}
+            </div>
+            <div className="mt-4 rounded-2xl border border-slate-200 bg-white/80 p-3 text-sm">
+              <p className="text-xs font-semibold uppercase tracking-[0.2em] text-slate-500">
+                {selectedLocation ? `${selectedLocation} members` : "Select a location"}
+              </p>
+              {selectedLocation ? (
+                <div className="mt-2 max-h-40 space-y-2 overflow-auto">
+                  {locationPeople.length === 0 && (
+                    <p className="text-sm text-slate-500">No members in this location.</p>
+                  )}
+                  {locationPeople.map((person) => (
+                    <div key={person.id} className="flex items-center justify-between">
+                      <span className="font-semibold text-slate-800">{person.fullName}</span>
+                      <span className="text-xs text-slate-500">
+                        Age {calculateAge(person.birthDate, person.deathDate)}
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <p className="mt-2 text-sm text-slate-500">
+                  Pick a location to view matching members.
+                </p>
+              )}
             </div>
           </div>
           <div className="glass-card rounded-3xl p-6">
@@ -472,37 +604,64 @@ export const StatsPanel = ({ persons, relationships = [] }: StatsPanelProps) => 
               </div>
             </div>
           </div>
-          <div className="glass-card rounded-3xl p-6">
+        </div>
+      </div>
+      <div className="glass-card rounded-3xl p-6">
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <div>
             <h2 className="text-2xl text-slate-900">Family Size</h2>
-            <p className="text-sm text-slate-600">Parent and child relationships overview.</p>
-            <div className="mt-4 grid grid-cols-2 gap-3 text-sm text-slate-600">
-              <div>
-                <p className="font-semibold text-slate-500">Avg children per parent</p>
-                <p className="text-lg font-semibold text-slate-900">
-                  {familySizeStats.avgChildren ? familySizeStats.avgChildren.toFixed(1) : "N/A"}
-                </p>
-              </div>
-              <div>
-                <p className="font-semibold text-slate-500">Median children</p>
-                <p className="text-lg font-semibold text-slate-900">
-                  {familySizeStats.medianChildren ?? "N/A"}
-                </p>
-              </div>
-            </div>
-            <div className="mt-4 space-y-2">
-              {familySizeStats.topParents.length === 0 && (
-                <p className="text-sm text-slate-500">No parent links yet.</p>
-              )}
-              {familySizeStats.topParents.map((entry) => (
-                <div key={entry.name} className="flex items-center justify-between text-sm">
-                  <span className="font-semibold text-slate-800">{entry.name}</span>
-                  <span className="rounded-full bg-slate-100 px-3 py-1 text-xs font-semibold text-slate-600">
-                    {entry.count} children
-                  </span>
-                </div>
-              ))}
-            </div>
+            <p className="text-sm text-slate-600">
+              Partnered parents are grouped into one family entry.
+            </p>
           </div>
+          <div className="flex items-center gap-2 text-xs text-slate-500">
+            <span>
+              Page {familyPage} of {totalFamilyPages}
+            </span>
+            <button
+              className="rounded-full border border-slate-200 bg-white px-3 py-1 font-semibold text-slate-600 disabled:opacity-50"
+              onClick={() => setFamilyPage((prev) => Math.max(1, prev - 1))}
+              disabled={familyPage <= 1}
+              type="button"
+            >
+              Previous
+            </button>
+            <button
+              className="rounded-full border border-slate-200 bg-white px-3 py-1 font-semibold text-slate-600 disabled:opacity-50"
+              onClick={() => setFamilyPage((prev) => Math.min(totalFamilyPages, prev + 1))}
+              disabled={familyPage >= totalFamilyPages}
+              type="button"
+            >
+              Next
+            </button>
+          </div>
+        </div>
+        <div className="mt-4 grid grid-cols-2 gap-3 text-sm text-slate-600">
+          <div>
+            <p className="font-semibold text-slate-500">Avg children per family</p>
+            <p className="text-lg font-semibold text-slate-900">
+              {familyStats.avgChildren ? familyStats.avgChildren.toFixed(1) : "N/A"}
+            </p>
+          </div>
+          <div>
+            <p className="font-semibold text-slate-500">Median children</p>
+            <p className="text-lg font-semibold text-slate-900">
+              {familyStats.medianChildren ?? "N/A"}
+            </p>
+          </div>
+        </div>
+        <div className="mt-4 space-y-2">
+          {familyUnits.length === 0 && (
+            <p className="text-sm text-slate-500">No parent links yet.</p>
+          )}
+          {familyPageItems.map((entry) => (
+            <div key={entry.label} className="flex items-center justify-between text-sm">
+              <span className="font-semibold text-slate-800">{entry.label}</span>
+              <span className="rounded-full bg-slate-100 px-3 py-1 text-xs font-semibold text-slate-600">
+                {entry.count} children
+              </span>
+            </div>
+          ))}
         </div>
       </div>
     </section>
