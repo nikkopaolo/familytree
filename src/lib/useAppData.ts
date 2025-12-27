@@ -1004,7 +1004,7 @@ export const useAppData = () => {
         }
       }
     }
-    if (!clanId || !isUuid(clanId)) {
+    if (isSupabaseEnabled && (!clanId || !isUuid(clanId))) {
       return { error: "No valid clan selected for import." };
     }
 
