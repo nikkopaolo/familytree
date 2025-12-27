@@ -112,8 +112,12 @@ const mapChangeEventRow = (row: any): ChangeEvent => ({
 const resolveActiveClanId = (
   clansList: Clan[],
   membershipsList: Membership[],
-  currentId: string
+  currentId: string,
+  storedId?: string
 ) => {
+  if (storedId && clansList.some((clan) => clan.id === storedId)) {
+    return storedId;
+  }
   const membershipClanId = membershipsList[0]?.clanId;
   if (membershipClanId && clansList.some((clan) => clan.id === membershipClanId)) {
     return membershipClanId;
@@ -138,6 +142,16 @@ const normalizePersonPayload = (payload: Record<string, unknown>, person?: Perso
     };
   }
   return payload;
+};
+
+const getStoredClanId = () => {
+  if (typeof window === "undefined") return "";
+  return window.localStorage.getItem("famtree.activeClanId") ?? "";
+};
+
+const storeClanId = (clanId: string) => {
+  if (typeof window === "undefined") return;
+  window.localStorage.setItem("famtree.activeClanId", clanId);
 };
 
 const normalizeImportedPerson = (input: Record<string, any>): Person => {
@@ -1150,8 +1164,9 @@ export const useAppData = () => {
         description: row.description ?? undefined,
       }));
       setClans(mapped);
+      const storedId = getStoredClanId();
       setActiveClanId((prev) =>
-        resolveActiveClanId(mapped, preferredMemberships, prev)
+        resolveActiveClanId(mapped, preferredMemberships, prev, storedId)
       );
     }
   };
@@ -1273,6 +1288,12 @@ export const useAppData = () => {
     loadClanData();
     setManualPositions({});
   }, [activeClanId, isGuest, isSupabaseEnabled]);
+
+  useEffect(() => {
+    if (activeClanId) {
+      storeClanId(activeClanId);
+    }
+  }, [activeClanId]);
 
   useEffect(() => {
     if (!selectedPersonId && clanPersons.length > 0) {
