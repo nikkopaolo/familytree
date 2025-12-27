@@ -127,37 +127,57 @@ before insert on public.persons
 for each row execute procedure public.set_branch_root();
 
 create or replace function public.is_clan_member(target_clan uuid)
-returns boolean as $$
+returns boolean
+language sql
+stable
+security definer
+set search_path = public
+as $$
   select exists (
     select 1 from public.clan_memberships m
     where m.clan_id = target_clan and m.user_id = auth.uid()
   );
-$$ language sql stable;
+$$;
 
 create or replace function public.is_clan_public(target_clan uuid)
-returns boolean as $$
+returns boolean
+language sql
+stable
+security definer
+set search_path = public
+as $$
   select exists (
     select 1 from public.clans c
     where c.id = target_clan and c.is_public = true
   );
-$$ language sql stable;
+$$;
 
 create or replace function public.is_clan_admin(target_clan uuid)
-returns boolean as $$
+returns boolean
+language sql
+stable
+security definer
+set search_path = public
+as $$
   select exists (
     select 1 from public.clan_memberships m
     where m.clan_id = target_clan and m.user_id = auth.uid() and m.role = 'admin'
   );
-$$ language sql stable;
+$$;
 
 create or replace function public.is_branch_owner(target_clan uuid, branch_root uuid)
-returns boolean as $$
+returns boolean
+language sql
+stable
+security definer
+set search_path = public
+as $$
   select exists (
     select 1 from public.branch_owners bo
     where bo.clan_id = target_clan and bo.user_id = auth.uid()
       and bo.branch_root_id = branch_root
   );
-$$ language sql stable;
+$$;
 
 alter table public.clans enable row level security;
 alter table public.profiles enable row level security;
