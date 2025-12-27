@@ -11,14 +11,29 @@ const csvHeaders = [
   "notes",
 ];
 
+const resolveLocation = (person: Person) =>
+  person.stats?.location ?? (person as { location?: string }).location ?? "";
+
+const resolveStats = (person: Person) => {
+  const fallback = person as { location?: string; occupation?: string };
+  const base = person.stats ?? {};
+  return {
+    ...base,
+    ...(fallback.location !== undefined ? { location: fallback.location } : {}),
+    ...(fallback.occupation !== undefined ? { occupation: fallback.occupation } : {}),
+  };
+};
+
+const resolveIsAlive = (person: Person) => (person.deathDate ? false : person.isAlive);
+
 export const exportPeopleCsv = (persons: Person[]) => {
   const rows = persons.map((person) => [
     person.fullName,
     person.birthDate ?? "",
     person.deathDate ?? "",
-    person.isAlive ? "true" : "false",
+    resolveIsAlive(person) ? "true" : "false",
     person.gender ?? "",
-    person.stats?.location ?? "",
+    resolveLocation(person),
     person.photoUrl ?? "",
     person.notes?.replace(/\n/g, " ") ?? "",
   ]);
@@ -37,7 +52,11 @@ export const exportTreeJson = (persons: Person[], relationships: Relationship[])
   return JSON.stringify(
     {
       exportedAt: new Date().toISOString(),
-      persons,
+      persons: persons.map((person) => ({
+        ...person,
+        isAlive: resolveIsAlive(person),
+        stats: resolveStats(person),
+      })),
       relationships,
     },
     null,

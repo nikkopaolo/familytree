@@ -106,6 +106,34 @@ const normalizePersonPayload = (payload: Record<string, unknown>, person?: Perso
   return payload;
 };
 
+const normalizeImportedPerson = (input: Record<string, any>): Person => {
+  const stats = (input.stats ?? {}) as Record<string, unknown>;
+  const location = input.location ?? (stats as { location?: string }).location;
+  const occupation = input.occupation ?? (stats as { occupation?: string }).occupation;
+  const deathDate = input.deathDate ?? input.death_date ?? undefined;
+  const isAlive =
+    deathDate ? false : typeof input.isAlive === "boolean" ? input.isAlive : true;
+
+  return {
+    id: input.id ?? crypto.randomUUID(),
+    clanId: input.clanId ?? "",
+    branchRootId: input.branchRootId ?? input.branch_root_id ?? input.id ?? "",
+    fullName: input.fullName ?? input.full_name ?? "New Member",
+    birthDate: input.birthDate ?? input.birth_date ?? undefined,
+    deathDate,
+    isAlive,
+    gender: input.gender ?? undefined,
+    photoUrl: input.photoUrl ?? input.photo_url ?? undefined,
+    notes: input.notes ?? undefined,
+    stats: {
+      ...stats,
+      ...(location !== undefined ? { location } : {}),
+      ...(occupation !== undefined ? { occupation } : {}),
+    },
+    createdAt: input.createdAt ?? input.created_at ?? new Date().toISOString(),
+  };
+};
+
 const toPersonUpdateRow = (payload: Record<string, unknown>) => {
   const row: Record<string, unknown> = {};
   if ("fullName" in payload) row.full_name = payload.fullName;
@@ -728,13 +756,17 @@ export const useAppData = () => {
   const importPeople = async (rows: Array<Record<string, string>>) => {
     const imported = rows.map((row) => {
       const id = crypto.randomUUID();
+      const deathDate = row.death_date || row.deathDate || undefined;
+      const isAlive = row.is_alive
+        ? row.is_alive.toLowerCase() !== "false"
+        : !deathDate;
       return {
         id,
         clanId: activeClanId,
         fullName: row.full_name || row.fullName || "New Member",
         birthDate: row.birth_date || undefined,
-        deathDate: row.death_date || undefined,
-        isAlive: row.is_alive ? row.is_alive.toLowerCase() !== "false" : true,
+        deathDate,
+        isAlive,
         gender: row.gender || undefined,
         branchRootId: id,
         photoUrl: row.photo_url || row.photoUrl || undefined,
@@ -778,13 +810,20 @@ export const useAppData = () => {
   };
 
   const importTreeJson = async (payload: { persons: Person[]; relationships: Relationship[] }) => {
-    const incomingPersons = (payload.persons ?? []).map((person) => ({
-      ...person,
-      clanId: activeClanId,
-    }));
+    const incomingPersons = (payload.persons ?? []).map((person) => {
+      const normalized = normalizeImportedPerson(person as Record<string, unknown>);
+      return {
+        ...normalized,
+        clanId: activeClanId,
+        branchRootId: normalized.branchRootId || normalized.id,
+      };
+    });
     const incomingRelationships = (payload.relationships ?? []).map((rel) => ({
-      ...rel,
+      id: rel.id ?? crypto.randomUUID(),
       clanId: activeClanId,
+      parentId: rel.parentId ?? (rel as any).parent_id,
+      childId: rel.childId ?? (rel as any).child_id,
+      relationshipType: rel.relationshipType ?? (rel as any).relationship_type ?? "parent",
     }));
 
     if (!isSupabaseEnabled || !supabase) {

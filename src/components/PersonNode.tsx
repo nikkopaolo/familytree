@@ -76,6 +76,7 @@ export const PersonNode = ({ data, selected }: NodeProps<PersonNodeData>) => {
   const [formState, setFormState] = useState({
     fullName: person.fullName,
     birthDate: person.birthDate ?? "",
+    deathDate: person.deathDate ?? "",
     gender: isFemale ? "Female" : isMale ? "Male" : "",
     location: person.stats?.location ?? "",
     isAlive: person.isAlive,
@@ -87,6 +88,7 @@ export const PersonNode = ({ data, selected }: NodeProps<PersonNodeData>) => {
     setFormState({
       fullName: person.fullName,
       birthDate: person.birthDate ?? "",
+      deathDate: person.deathDate ?? "",
       gender: isFemale ? "Female" : isMale ? "Male" : "",
       location: person.stats?.location ?? "",
       isAlive: person.isAlive,
@@ -96,6 +98,7 @@ export const PersonNode = ({ data, selected }: NodeProps<PersonNodeData>) => {
     isFemale,
     isMale,
     person.birthDate,
+    person.deathDate,
     person.fullName,
     person.isAlive,
     person.stats?.location,
@@ -113,6 +116,7 @@ export const PersonNode = ({ data, selected }: NodeProps<PersonNodeData>) => {
     setFormState({
       fullName: person.fullName,
       birthDate: person.birthDate ?? "",
+      deathDate: person.deathDate ?? "",
       gender: isFemale ? "Female" : isMale ? "Male" : "",
       location: person.stats?.location ?? "",
       isAlive: person.isAlive,
@@ -134,6 +138,7 @@ export const PersonNode = ({ data, selected }: NodeProps<PersonNodeData>) => {
       {
         fullName: nameValue || person.fullName,
         birthDate: formState.birthDate || null,
+        deathDate: formState.isAlive ? null : formState.deathDate || null,
         gender: formState.gender || null,
         location: locationValue || null,
         isAlive: formState.isAlive,
@@ -277,6 +282,22 @@ export const PersonNode = ({ data, selected }: NodeProps<PersonNodeData>) => {
                 onMouseDown={(event) => event.stopPropagation()}
               />
             </label>
+            {!formState.isAlive && (
+              <label className="block">
+                <span className="text-[10px] font-semibold uppercase tracking-[0.2em] text-slate-400">
+                  Deceased date
+                </span>
+                <input
+                  type="date"
+                  className="mt-1 w-full rounded-xl border border-slate-200 px-3 py-1 text-xs"
+                  value={formState.deathDate}
+                  onChange={(event) =>
+                    setFormState((prev) => ({ ...prev, deathDate: event.target.value }))
+                  }
+                  onMouseDown={(event) => event.stopPropagation()}
+                />
+              </label>
+            )}
             <label className="block">
               <span className="text-[10px] font-semibold uppercase tracking-[0.2em] text-slate-400">
                 Gender
@@ -305,6 +326,7 @@ export const PersonNode = ({ data, selected }: NodeProps<PersonNodeData>) => {
                   setFormState((prev) => ({
                     ...prev,
                     isAlive: event.target.value === "alive",
+                    deathDate: event.target.value === "alive" ? "" : prev.deathDate,
                   }))
                 }
                 onMouseDown={(event) => event.stopPropagation()}
@@ -325,8 +347,8 @@ export const PersonNode = ({ data, selected }: NodeProps<PersonNodeData>) => {
                 setFormState((prev) => ({ ...prev, location: event.target.value }))
               }
               onMouseDown={(event) => event.stopPropagation()}
-              />
-            </label>
+            />
+          </label>
           {!canEdit && (
             <label className="block">
               <span className="text-[10px] font-semibold uppercase tracking-[0.2em] text-slate-400">

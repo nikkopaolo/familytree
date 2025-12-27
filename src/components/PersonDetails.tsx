@@ -43,6 +43,7 @@ export const PersonDetails = ({
     notes: "",
     location: "",
     birthDate: "",
+    deathDate: "",
     gender: "",
   });
   const photoInputRef = useRef<HTMLInputElement | null>(null);
@@ -171,6 +172,7 @@ export const PersonDetails = ({
       notes: person.notes ?? "",
       location: person.stats?.location ?? "",
       birthDate: person.birthDate ?? "",
+      deathDate: person.deathDate ?? "",
       gender: person.gender ?? "",
     });
   }, [person]);
@@ -190,6 +192,7 @@ export const PersonDetails = ({
       isAlive: formState.isAlive,
       notes: formState.notes,
       birthDate: formState.birthDate || null,
+      deathDate: formState.isAlive ? null : formState.deathDate || null,
       gender: formState.gender || null,
       stats: {
         ...(person.stats ?? {}),
@@ -313,6 +316,12 @@ export const PersonDetails = ({
           <span className="font-semibold text-slate-700">Birthday:</span>{" "}
           {formatDate(person.birthDate)}
         </p>
+        {!person.isAlive && (
+          <p>
+            <span className="font-semibold text-slate-700">Deceased:</span>{" "}
+            {formatDate(person.deathDate)}
+          </p>
+        )}
         <p>
           <span className="font-semibold text-slate-700">Gender:</span>{" "}
           {person.gender ?? "Unknown"}
@@ -520,6 +529,19 @@ export const PersonDetails = ({
                 }
               />
             </label>
+            {!formState.isAlive && (
+              <label className="block">
+                <span className="text-xs text-slate-500">Deceased date</span>
+                <input
+                  type="date"
+                  className="mt-1 w-full rounded-xl border border-slate-200 px-3 py-2"
+                  value={formState.deathDate}
+                  onChange={(event) =>
+                    setFormState((prev) => ({ ...prev, deathDate: event.target.value }))
+                  }
+                />
+              </label>
+            )}
             <label className="block">
               <span className="text-xs text-slate-500">Gender</span>
               <select
@@ -550,7 +572,11 @@ export const PersonDetails = ({
                 className="mt-1 w-full rounded-xl border border-slate-200 px-3 py-2"
                 value={formState.isAlive ? "alive" : "deceased"}
                 onChange={(event) =>
-                  setFormState((prev) => ({ ...prev, isAlive: event.target.value === "alive" }))
+                  setFormState((prev) => ({
+                    ...prev,
+                    isAlive: event.target.value === "alive",
+                    deathDate: event.target.value === "alive" ? "" : prev.deathDate,
+                  }))
                 }
               >
                 <option value="alive">Alive</option>
