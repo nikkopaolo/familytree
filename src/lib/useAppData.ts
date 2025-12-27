@@ -109,6 +109,21 @@ const mapChangeEventRow = (row: any): ChangeEvent => ({
   createdAt: row.created_at,
 });
 
+const resolveActiveClanId = (
+  clansList: Clan[],
+  membershipsList: Membership[],
+  currentId: string
+) => {
+  const membershipClanId = membershipsList[0]?.clanId;
+  if (membershipClanId && clansList.some((clan) => clan.id === membershipClanId)) {
+    return membershipClanId;
+  }
+  if (currentId && clansList.some((clan) => clan.id === currentId)) {
+    return currentId;
+  }
+  return clansList[0]?.id ?? "";
+};
+
 const normalizePersonPayload = (payload: Record<string, unknown>, person?: Person) => {
   if ("location" in payload && !("stats" in payload)) {
     const location = payload.location;
@@ -1121,6 +1136,26 @@ export const useAppData = () => {
     return { error: "" };
   };
 
+  const loadClans = async (preferredMemberships: Membership[] = memberships) => {
+    const client = supabase;
+    if (!isSupabaseEnabled || !client) return;
+    const { data: clanRows } = await client
+      .from("clans")
+      .select("id, name, slug, description, is_public");
+    if (clanRows && clanRows.length > 0) {
+      const mapped = (clanRows ?? []).map((row: any) => ({
+        id: row.id,
+        name: row.name,
+        slug: row.slug,
+        description: row.description ?? undefined,
+      }));
+      setClans(mapped);
+      setActiveClanId((prev) =>
+        resolveActiveClanId(mapped, preferredMemberships, prev)
+      );
+    }
+  };
+
   useEffect(() => {
     const client = supabase;
     if (!isSupabaseEnabled || !client) return;
@@ -1133,6 +1168,7 @@ export const useAppData = () => {
         setIsGuest(true);
         setMemberships([]);
         setBranchOwners([]);
+        await loadClans([]);
         return;
       }
 
@@ -1162,6 +1198,7 @@ export const useAppData = () => {
         membershipsList = await fetchMemberships();
       }
       setMemberships(membershipsList);
+      await loadClans(membershipsList);
 
       const { data: ownersRows } = await client
         .from("branch_owners")
@@ -1187,27 +1224,8 @@ export const useAppData = () => {
   }, [isSupabaseEnabled]);
 
   useEffect(() => {
-    const client = supabase;
-    if (!isSupabaseEnabled || !client) return;
-
-    const loadClans = async () => {
-      const { data: clanRows } = await client
-        .from("clans")
-        .select("id, name, slug, description, is_public");
-      if (clanRows && clanRows.length > 0) {
-        const mapped = (clanRows ?? []).map((row: any) => ({
-          id: row.id,
-          name: row.name,
-          slug: row.slug,
-          description: row.description ?? undefined,
-        }));
-        setClans(mapped);
-        setActiveClanId((prev) => mapped.find((clan) => clan.id === prev)?.id ?? mapped[0]?.id ?? "");
-      }
-    };
-
     loadClans();
-  }, [isSupabaseEnabled]);
+  }, [isSupabaseEnabled, currentUser.id]);
 
   useEffect(() => {
     const client = supabase;
