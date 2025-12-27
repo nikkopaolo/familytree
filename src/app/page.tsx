@@ -51,7 +51,7 @@ export default function Home() {
   } = useAppData();
 
   const [activeTab, setActiveTab] = useState<AppTab>("tree");
-  const [rootId, setRootId] = useState("");
+  const [rootId, setRootId] = useState("all");
   const [maxDepth, setMaxDepth] = useState(4);
   const [maxNodes, setMaxNodes] = useState(40);
   const [unlimitedGenerations, setUnlimitedGenerations] = useState(true);
@@ -59,8 +59,9 @@ export default function Home() {
   const [addChildParentId, setAddChildParentId] = useState<string>("");
 
   useEffect(() => {
-    if (clanPersons.length > 0 && !rootId) {
-      setRootId(clanPersons[0]?.id ?? "");
+    if (clanPersons.length === 0) return;
+    if (!rootId || (rootId !== "all" && !clanPersons.some((person) => person.id === rootId))) {
+      setRootId("all");
     }
   }, [clanPersons, rootId]);
 

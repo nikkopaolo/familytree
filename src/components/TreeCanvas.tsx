@@ -84,6 +84,13 @@ export const TreeCanvas = ({
   const [flowInstance, setFlowInstance] = useState<ReactFlowInstance | null>(null);
   const [editingNodeId, setEditingNodeId] = useState("");
   const hasPeople = persons.length > 0;
+  const sortedPersons = useMemo(
+    () =>
+      [...persons].sort((a, b) =>
+        a.fullName.localeCompare(b.fullName, undefined, { sensitivity: "base" })
+      ),
+    [persons]
+  );
 
   useEffect(() => {
     if (!isFullscreen) return;
@@ -232,6 +239,8 @@ export const TreeCanvas = ({
   }, [persons, relationships]);
 
   const relationshipDetails = useMemo(() => {
+    const sortByName = (a: Person, b: Person) =>
+      a.fullName.localeCompare(b.fullName, undefined, { sensitivity: "base" });
     const map = new Map<
       string,
       {
@@ -284,15 +293,15 @@ export const TreeCanvas = ({
       const parentIds = new Set(entry.parents.map((item) => item.person.id));
       const childIds = new Set(entry.children.map((item) => item.person.id));
       const partnerIds = new Set(entry.partners.map((item) => item.person.id));
-      entry.eligibleParents = persons.filter(
-        (candidate) => candidate.id !== person.id && !parentIds.has(candidate.id)
-      );
-      entry.eligibleChildren = persons.filter(
-        (candidate) => candidate.id !== person.id && !childIds.has(candidate.id)
-      );
-      entry.eligiblePartners = persons.filter(
-        (candidate) => candidate.id !== person.id && !partnerIds.has(candidate.id)
-      );
+      entry.eligibleParents = persons
+        .filter((candidate) => candidate.id !== person.id && !parentIds.has(candidate.id))
+        .sort(sortByName);
+      entry.eligibleChildren = persons
+        .filter((candidate) => candidate.id !== person.id && !childIds.has(candidate.id))
+        .sort(sortByName);
+      entry.eligiblePartners = persons
+        .filter((candidate) => candidate.id !== person.id && !partnerIds.has(candidate.id))
+        .sort(sortByName);
     });
 
     return map;
@@ -435,7 +444,7 @@ export const TreeCanvas = ({
             onChange={(event) => onRootChange(event.target.value)}
           >
             <option value="all">All members</option>
-            {persons.map((person) => (
+            {sortedPersons.map((person) => (
               <option key={person.id} value={person.id}>
                 {person.fullName}
               </option>

@@ -5,6 +5,10 @@ import type { Person, Relationship, PersonPosition } from "./types";
 const NODE_WIDTH = 280;
 const NODE_HEIGHT = 170;
 const FAMILY_NODE_SIZE = 12;
+const PARTNER_EDGE_WEIGHT = 4;
+const PARTNER_EDGE_MINLEN = 0;
+const PARENT_EDGE_MINLEN = 1;
+const CHILD_EDGE_MINLEN = 1;
 
 export type TreeLayoutDirection = "TB" | "LR";
 
@@ -172,18 +176,27 @@ export const buildTreeGraph = ({
     graph.setNode(group.id, { width: FAMILY_NODE_SIZE, height: FAMILY_NODE_SIZE });
     graph.setEdge(group.parentA, group.id, { weight: 1.2, minlen: 1 });
     graph.setEdge(group.parentB, group.id, { weight: 1.2, minlen: 1 });
-    graph.setEdge(group.parentA, group.parentB, { weight: 2.5, minlen: 1 });
+    graph.setEdge(group.parentA, group.parentB, {
+      weight: PARTNER_EDGE_WEIGHT,
+      minlen: PARTNER_EDGE_MINLEN,
+    });
     group.children.forEach((childId) => {
-      graph.setEdge(group.id, childId, { weight: 2, minlen: 2 });
+      graph.setEdge(group.id, childId, { weight: 2, minlen: CHILD_EDGE_MINLEN });
     });
   });
 
   parentLinks.forEach((rel) => {
     if (familyParentChildPairs.has(`${rel.parentId}|${rel.childId}`)) return;
-    graph.setEdge(rel.parentId, rel.childId, { weight: 1.5, minlen: 2 });
+    graph.setEdge(rel.parentId, rel.childId, {
+      weight: 1.5,
+      minlen: PARENT_EDGE_MINLEN,
+    });
   });
   partnerLinks.forEach((rel) => {
-    graph.setEdge(rel.parentId, rel.childId, { weight: 2, minlen: 1 });
+    graph.setEdge(rel.parentId, rel.childId, {
+      weight: PARTNER_EDGE_WEIGHT,
+      minlen: PARTNER_EDGE_MINLEN,
+    });
   });
 
   dagre.layout(graph);
@@ -281,26 +294,61 @@ export const buildTreeGraph = ({
   const parentSourceHandle = direction === "LR" ? "parent-right" : "parent-bottom";
   const parentTargetHandle = direction === "LR" ? "parent-left" : "parent-top";
 
-  const getPartnerHandles = (sourceId: string, targetId: string) => {
-    const sourceCenter = resolvedCenters.get(sourceId);
-    const targetCenter = resolvedCenters.get(targetId);
-    if (!sourceCenter || !targetCenter) {
+  const getPartnerEdge = (firstId: string, secondId: string) => {
+    const firstCenter = resolvedCenters.get(firstId);
+    const secondCenter = resolvedCenters.get(secondId);
+    if (!firstCenter || !secondCenter) {
       return direction === "LR"
-        ? { sourceHandle: "partner-bottom", targetHandle: "partner-top" }
-        : { sourceHandle: "partner-right", targetHandle: "partner-left" };
+        ? {
+            source: firstId,
+            target: secondId,
+            sourceHandle: "partner-bottom",
+            targetHandle: "partner-top",
+          }
+        : {
+            source: firstId,
+            target: secondId,
+            sourceHandle: "partner-right",
+            targetHandle: "partner-left",
+          };
     }
-    if (direction === "LR") {
-      const sourceAbove = sourceCenter.y <= targetCenter.y;
-      return {
-        sourceHandle: sourceAbove ? "partner-bottom" : "partner-top",
-        targetHandle: sourceAbove ? "partner-top" : "partner-bottom",
-      };
+    const deltaX = secondCenter.x - firstCenter.x;
+    const deltaY = secondCenter.y - firstCenter.y;
+    const absX = Math.abs(deltaX);
+    const absY = Math.abs(deltaY);
+    const useVertical = direction === "LR" ? absY >= absX : absY > absX;
+
+    if (useVertical) {
+      const sourceAbove = firstCenter.y <= secondCenter.y;
+      return sourceAbove
+        ? {
+            source: firstId,
+            target: secondId,
+            sourceHandle: "partner-bottom",
+            targetHandle: "partner-top",
+          }
+        : {
+            source: secondId,
+            target: firstId,
+            sourceHandle: "partner-bottom",
+            targetHandle: "partner-top",
+          };
     }
-    const sourceLeft = sourceCenter.x <= targetCenter.x;
-    return {
-      sourceHandle: sourceLeft ? "partner-right" : "partner-left",
-      targetHandle: sourceLeft ? "partner-left" : "partner-right",
-    };
+
+    const sourceLeft = firstCenter.x <= secondCenter.x;
+    return sourceLeft
+      ? {
+          source: firstId,
+          target: secondId,
+          sourceHandle: "partner-right",
+          targetHandle: "partner-left",
+        }
+      : {
+          source: secondId,
+          target: firstId,
+          sourceHandle: "partner-right",
+          targetHandle: "partner-left",
+        };
   };
 
   const parentEdges = parentLinks
@@ -322,25 +370,29 @@ export const buildTreeGraph = ({
       style: { stroke: "rgba(31, 41, 51, 0.7)", strokeWidth: 2.5 },
     }));
 
-  const partnerEdges = partnerLinks.map((rel) => ({
-    id: rel.id,
-    source: rel.parentId,
-    target: rel.childId,
-    ...getPartnerHandles(rel.parentId, rel.childId),
-    type: "smoothstep",
-    animated: false,
-    label: "Partner of",
-    labelStyle,
-    labelBgStyle: { fill: "rgba(255, 250, 241, 0.9)" },
-    labelBgPadding: [6, 3] as [number, number],
-    labelBgBorderRadius: 8,
-    className: "edge-partner",
-    style: {
-      stroke: "rgba(234, 179, 8, 0.7)",
-      strokeWidth: 2.5,
-      strokeDasharray: "6 4",
-    },
-  }));
+  const partnerEdges = partnerLinks.map((rel) => {
+    const edge = getPartnerEdge(rel.parentId, rel.childId);
+    return {
+      id: rel.id,
+      source: edge.source,
+      target: edge.target,
+      sourceHandle: edge.sourceHandle,
+      targetHandle: edge.targetHandle,
+      type: "smoothstep",
+      animated: false,
+      label: "Partner of",
+      labelStyle,
+      labelBgStyle: { fill: "rgba(255, 250, 241, 0.9)" },
+      labelBgPadding: [6, 3] as [number, number],
+      labelBgBorderRadius: 8,
+      className: "edge-partner",
+      style: {
+        stroke: "rgba(234, 179, 8, 0.7)",
+        strokeWidth: 2.5,
+        strokeDasharray: "6 4",
+      },
+    };
+  });
 
   const familyConnectorEdges: Edge[] = [];
   const familyEdges: Edge[] = [];

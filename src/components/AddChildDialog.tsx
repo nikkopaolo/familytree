@@ -28,7 +28,12 @@ export const AddChildDialog = ({
   }, [isOpen, partners]);
 
   const partnerOptions = useMemo(
-    () => partners.map((partner) => ({ id: partner.id, label: partner.fullName })),
+    () =>
+      [...partners]
+        .sort((a, b) =>
+          a.fullName.localeCompare(b.fullName, undefined, { sensitivity: "base" })
+        )
+        .map((partner) => ({ id: partner.id, label: partner.fullName })),
     [partners]
   );
 

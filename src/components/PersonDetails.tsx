@@ -49,6 +49,8 @@ export const PersonDetails = ({
   const personId = person?.id ?? "";
 
   const relationshipSummary = useMemo(() => {
+    const sortByName = (a: Person, b: Person) =>
+      a.fullName.localeCompare(b.fullName, undefined, { sensitivity: "base" });
     if (!personId) {
       return {
         parents: [] as Person[],
@@ -77,15 +79,18 @@ export const PersonDetails = ({
 
     const parents = parentLinks
       .map((rel) => persons.find((p) => p.id === rel.parentId))
-      .filter(Boolean) as Person[];
+      .filter(Boolean)
+      .sort(sortByName) as Person[];
     const children = childLinks
       .map((rel) => persons.find((p) => p.id === rel.childId))
-      .filter(Boolean) as Person[];
+      .filter(Boolean)
+      .sort(sortByName) as Person[];
     const partners = partnerLinks
       .map((rel) =>
         persons.find((p) => p.id === (rel.parentId === personId ? rel.childId : rel.parentId))
       )
-      .filter(Boolean) as Person[];
+      .filter(Boolean)
+      .sort(sortByName) as Person[];
 
     const parentIdSet = new Set(parentLinks.map((rel) => rel.parentId));
     const childIdSet = new Set(childLinks.map((rel) => rel.childId));
@@ -93,15 +98,15 @@ export const PersonDetails = ({
       partnerLinks.map((rel) => (rel.parentId === personId ? rel.childId : rel.parentId))
     );
 
-    const eligibleParents = persons.filter(
-      (p) => p.id !== personId && !parentIdSet.has(p.id)
-    );
-    const eligibleChildren = persons.filter(
-      (p) => p.id !== personId && !childIdSet.has(p.id)
-    );
-    const eligiblePartners = persons.filter(
-      (p) => p.id !== personId && !partnerIdSet.has(p.id)
-    );
+    const eligibleParents = persons
+      .filter((p) => p.id !== personId && !parentIdSet.has(p.id))
+      .sort(sortByName);
+    const eligibleChildren = persons
+      .filter((p) => p.id !== personId && !childIdSet.has(p.id))
+      .sort(sortByName);
+    const eligiblePartners = persons
+      .filter((p) => p.id !== personId && !partnerIdSet.has(p.id))
+      .sort(sortByName);
 
     const siblingIds = new Set(
       relationships
@@ -114,7 +119,8 @@ export const PersonDetails = ({
 
     const siblings = Array.from(siblingIds)
       .map((id) => persons.find((p) => p.id === id))
-      .filter(Boolean) as Person[];
+      .filter(Boolean)
+      .sort(sortByName) as Person[];
 
     const grandparentIds = new Set(
       relationships
@@ -136,7 +142,8 @@ export const PersonDetails = ({
 
     const auntsUncles = Array.from(auntUncleIds)
       .map((id) => persons.find((p) => p.id === id))
-      .filter(Boolean) as Person[];
+      .filter(Boolean)
+      .sort(sortByName) as Person[];
 
     const nieceNephewIds = new Set(
       relationships
@@ -148,7 +155,8 @@ export const PersonDetails = ({
 
     const niecesNephews = Array.from(nieceNephewIds)
       .map((id) => persons.find((p) => p.id === id))
-      .filter(Boolean) as Person[];
+      .filter(Boolean)
+      .sort(sortByName) as Person[];
 
     return {
       parents,
