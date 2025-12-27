@@ -662,6 +662,128 @@ export const useAppData = () => {
   const createPartnerRelationship = async (personId: string, partnerId: string) =>
     createRelationship(personId, partnerId, "partner");
 
+  const deleteRelationship = async (relationshipId: string) => {
+    const target = relationships.find((rel) => rel.id === relationshipId);
+    if (!target) return;
+
+    setRelationships((prev) => prev.filter((rel) => rel.id !== relationshipId));
+
+    const diff = [
+      {
+        field: target.relationshipType,
+        before: `${target.parentId}:${target.childId}`,
+        after: "-",
+      },
+    ];
+
+    if (!isSupabaseEnabled || !supabase) {
+      setChangeEvents((prev) => [
+        {
+          id: crypto.randomUUID(),
+          clanId: activeClanId,
+          actorId: currentUser.id,
+          actorName: currentUser.name,
+          targetType: "relationship",
+          targetId: relationshipId,
+          action: "delete",
+          diff,
+          createdAt: new Date().toISOString(),
+        },
+        ...prev,
+      ]);
+      return;
+    }
+
+    let deletedViaAdmin = false;
+    const { data: sessionData } = await supabase.auth.getSession();
+    const token = sessionData.session?.access_token;
+    if (token) {
+      const response = await fetch("/api/admin/delete-relationship", {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${token}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ clanId: activeClanId, relationshipId }),
+      });
+      deletedViaAdmin = response.ok;
+    }
+
+    if (!deletedViaAdmin) {
+      await supabase.from("relationships").delete().eq("id", relationshipId);
+    }
+
+    await supabase.from("change_events").insert({
+      clan_id: activeClanId,
+      actor_id: currentUser.id,
+      actor_name: currentUser.name,
+      target_type: "relationship",
+      target_id: relationshipId,
+      action: "delete",
+      diff,
+    });
+
+    setChangeEvents((prev) => [
+      {
+        id: crypto.randomUUID(),
+        clanId: activeClanId,
+        actorId: currentUser.id,
+        actorName: currentUser.name,
+        targetType: "relationship",
+        targetId: relationshipId,
+        action: "delete",
+        diff,
+        createdAt: new Date().toISOString(),
+      },
+      ...prev,
+    ]);
+  };
+
+  const wipeClanData = async () => {
+    if (!activeClanId) return { error: "Missing clan." };
+
+    if (!isSupabaseEnabled || !supabase) {
+      setPersons((prev) => prev.filter((person) => person.clanId !== activeClanId));
+      setRelationships((prev) => prev.filter((rel) => rel.clanId !== activeClanId));
+      setPositions((prev) => prev.filter((pos) => pos.clanId !== activeClanId));
+      setSuggestions((prev) => prev.filter((item) => item.clanId !== activeClanId));
+      setChangeEvents((prev) => prev.filter((item) => item.clanId !== activeClanId));
+      setSelectedPersonId("");
+      return { error: "" };
+    }
+
+    let deletedViaAdmin = false;
+    const { data: sessionData } = await supabase.auth.getSession();
+    const token = sessionData.session?.access_token;
+    if (token) {
+      const response = await fetch("/api/admin/wipe-clan", {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${token}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ clanId: activeClanId }),
+      });
+      deletedViaAdmin = response.ok;
+    }
+
+    if (!deletedViaAdmin) {
+      await supabase.from("relationships").delete().eq("clan_id", activeClanId);
+      await supabase.from("person_positions").delete().eq("clan_id", activeClanId);
+      await supabase.from("suggestions").delete().eq("clan_id", activeClanId);
+      await supabase.from("change_events").delete().eq("clan_id", activeClanId);
+      await supabase.from("persons").delete().eq("clan_id", activeClanId);
+    }
+
+    setPersons((prev) => prev.filter((person) => person.clanId !== activeClanId));
+    setRelationships((prev) => prev.filter((rel) => rel.clanId !== activeClanId));
+    setPositions((prev) => prev.filter((pos) => pos.clanId !== activeClanId));
+    setSuggestions((prev) => prev.filter((item) => item.clanId !== activeClanId));
+    setChangeEvents((prev) => prev.filter((item) => item.clanId !== activeClanId));
+    setSelectedPersonId("");
+    return { error: "" };
+  };
+
   const approveSuggestion = async (suggestionId: string) => {
     const suggestion = suggestions.find((item) => item.id === suggestionId);
     if (!suggestion || suggestion.targetType !== "person" || !suggestion.targetId) {
@@ -1088,9 +1210,11 @@ export const useAppData = () => {
     createPerson,
     createParentChildRelationship,
     createPartnerRelationship,
+    deleteRelationship,
     uploadPersonPhoto,
     importPeople,
     importTreeJson,
+    wipeClanData,
     manualPositions,
     updateManualPosition,
     selectedPersonId,

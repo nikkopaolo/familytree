@@ -50,6 +50,8 @@ export default function Home() {
     createPerson,
     createParentChildRelationship,
     createPartnerRelationship,
+    deleteRelationship,
+    wipeClanData,
     inviteAdmin,
     adminBootstrapError,
   } = useAppData();
@@ -68,6 +70,7 @@ export default function Home() {
 
   const selectedPerson = clanPersons.find((person) => person.id === selectedPersonId);
   const addChildParent = clanPersons.find((person) => person.id === addChildParentId);
+  const canDeleteSelected = selectedPerson ? canEditPerson(selectedPerson) : false;
 
   const addChildPartners = useMemo(() => {
     if (!addChildParentId) return [];
@@ -194,6 +197,16 @@ export default function Home() {
                 }
               }}
               onUpdatePerson={handleInlineUpdate}
+              onDeleteRelationship={deleteRelationship}
+              onLinkParent={(childId, parentId) =>
+                createParentChildRelationship(parentId, childId)
+              }
+              onLinkChild={(parentId, childId) =>
+                createParentChildRelationship(parentId, childId)
+              }
+              onLinkPartner={(personId, partnerId) =>
+                createPartnerRelationship(personId, partnerId)
+              }
               onUpdatePosition={updateManualPosition}
               selectedPersonId={selectedPersonId}
               onSelectPerson={setSelectedPersonId}
@@ -207,7 +220,15 @@ export default function Home() {
           )}
           {activeTab === "list" && (
             <>
-              <MembersTable persons={clanPersons} onSelectPerson={setSelectedPersonId} />
+              <MembersTable
+                persons={clanPersons}
+                onSelectPerson={setSelectedPersonId}
+                selectedPersonId={selectedPersonId}
+                canDeleteSelected={canDeleteSelected}
+                canWipe={isAdmin}
+                onDeletePerson={deletePerson}
+                onWipeList={wipeClanData}
+              />
               <ImportExportPanel
                 persons={clanPersons}
                 relationships={clanRelationships}

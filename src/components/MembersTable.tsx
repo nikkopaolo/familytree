@@ -8,11 +8,42 @@ import { calculateAge, formatDate } from "@/lib/utils";
 type MembersTableProps = {
   persons: Person[];
   onSelectPerson: (id: string) => void;
+  selectedPersonId?: string;
+  canDeleteSelected?: boolean;
+  canWipe?: boolean;
+  onDeletePerson?: (id: string) => void;
+  onWipeList?: () => Promise<{ error?: string }> | { error?: string } | void;
 };
 
-export const MembersTable = ({ persons, onSelectPerson }: MembersTableProps) => {
+export const MembersTable = ({
+  persons,
+  onSelectPerson,
+  selectedPersonId,
+  canDeleteSelected = false,
+  canWipe = false,
+  onDeletePerson,
+  onWipeList,
+}: MembersTableProps) => {
   const [query, setQuery] = useState("");
   const [filter, setFilter] = useState<"all" | "alive" | "deceased">("all");
+
+  const handleDeleteSelected = () => {
+    if (!selectedPersonId || !onDeletePerson) return;
+    const confirmed = window.confirm("Delete selected member? This will remove linked relationships.");
+    if (confirmed) {
+      onDeletePerson(selectedPersonId);
+    }
+  };
+
+  const handleWipeList = async () => {
+    if (!onWipeList) return;
+    const confirmation = window.prompt("Type WIPE to delete all members and relationships.");
+    if (confirmation !== "WIPE") return;
+    const result = await onWipeList();
+    if (result && result.error) {
+      window.alert(result.error);
+    }
+  };
 
   const filtered = useMemo(() => {
     return persons.filter((person) => {
@@ -49,6 +80,22 @@ export const MembersTable = ({ persons, onSelectPerson }: MembersTableProps) => 
               {value === "all" ? "All" : value === "alive" ? "Alive" : "Deceased"}
             </button>
           ))}
+        </div>
+        <div className="flex flex-wrap gap-2 text-xs font-semibold">
+          <button
+            className="rounded-full border border-rose-200 bg-rose-50 px-4 py-2 text-rose-700 disabled:cursor-not-allowed disabled:opacity-50"
+            onClick={handleDeleteSelected}
+            disabled={!canDeleteSelected || !selectedPersonId}
+          >
+            Delete selected
+          </button>
+          <button
+            className="rounded-full border border-rose-200 bg-rose-50 px-4 py-2 text-rose-700 disabled:cursor-not-allowed disabled:opacity-50"
+            onClick={handleWipeList}
+            disabled={!canWipe}
+          >
+            Wipe list
+          </button>
         </div>
       </div>
       <div className="mt-6 overflow-hidden rounded-2xl border border-slate-200 bg-white">

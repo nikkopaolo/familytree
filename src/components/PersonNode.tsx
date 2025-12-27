@@ -15,10 +15,22 @@ type PersonNodeData = {
     partners: number;
     siblings: number;
   };
+  links: {
+    parents: Array<{ id: string; person: Person }>;
+    children: Array<{ id: string; person: Person }>;
+    partners: Array<{ id: string; person: Person }>;
+    eligibleParents: Person[];
+    eligibleChildren: Person[];
+    eligiblePartners: Person[];
+  };
   canEdit: boolean;
   onAddChild: () => void;
   onAddPartner: () => void;
   onUpdate: (payload: Record<string, unknown>, email?: string) => Promise<void> | void;
+  onDeleteRelationship: (relationshipId: string) => void;
+  onLinkParent: (parentId: string) => void;
+  onLinkChild: (childId: string) => void;
+  onLinkPartner: (partnerId: string) => void;
 };
 
 const MaleIcon = ({ className }: { className?: string }) => (
@@ -56,7 +68,19 @@ const FemaleIcon = ({ className }: { className?: string }) => (
 );
 
 export const PersonNode = ({ data, selected }: NodeProps<PersonNodeData>) => {
-  const { person, stats, canEdit, onAddChild, onAddPartner, onUpdate } = data;
+  const {
+    person,
+    stats,
+    links,
+    canEdit,
+    onAddChild,
+    onAddPartner,
+    onUpdate,
+    onDeleteRelationship,
+    onLinkParent,
+    onLinkChild,
+    onLinkPartner,
+  } = data;
   const ageLabel = calculateAge(person.birthDate, person.deathDate);
   const statusLabel = person.isAlive ? "Alive" : "Deceased";
   const statusTone = person.isAlive
@@ -80,6 +104,11 @@ export const PersonNode = ({ data, selected }: NodeProps<PersonNodeData>) => {
     gender: isFemale ? "Female" : isMale ? "Male" : "",
     location: person.stats?.location ?? "",
     isAlive: person.isAlive,
+  });
+  const [linkState, setLinkState] = useState({
+    parentId: "",
+    childId: "",
+    partnerId: "",
   });
   const [suggestEmail, setSuggestEmail] = useState("");
 
@@ -108,6 +137,7 @@ export const PersonNode = ({ data, selected }: NodeProps<PersonNodeData>) => {
     setIsEditing(false);
     setIsSaving(false);
     setSuggestEmail("");
+    setLinkState({ parentId: "", childId: "", partnerId: "" });
   }, [person.id]);
 
   const startEditing = (event: MouseEvent<HTMLButtonElement>) => {
@@ -147,6 +177,33 @@ export const PersonNode = ({ data, selected }: NodeProps<PersonNodeData>) => {
     );
     setIsSaving(false);
     setIsEditing(false);
+  };
+
+  const handleRemoveLink =
+    (relationshipId: string) => (event: MouseEvent<HTMLButtonElement>) => {
+      event.stopPropagation();
+      onDeleteRelationship(relationshipId);
+    };
+
+  const handleLinkParent = (event: MouseEvent<HTMLButtonElement>) => {
+    event.stopPropagation();
+    if (!linkState.parentId) return;
+    onLinkParent(linkState.parentId);
+    setLinkState((prev) => ({ ...prev, parentId: "" }));
+  };
+
+  const handleLinkChild = (event: MouseEvent<HTMLButtonElement>) => {
+    event.stopPropagation();
+    if (!linkState.childId) return;
+    onLinkChild(linkState.childId);
+    setLinkState((prev) => ({ ...prev, childId: "" }));
+  };
+
+  const handleLinkPartner = (event: MouseEvent<HTMLButtonElement>) => {
+    event.stopPropagation();
+    if (!linkState.partnerId) return;
+    onLinkPartner(linkState.partnerId);
+    setLinkState((prev) => ({ ...prev, partnerId: "" }));
   };
   return (
     <div
@@ -382,6 +439,184 @@ export const PersonNode = ({ data, selected }: NodeProps<PersonNodeData>) => {
               <X size={12} />
               Cancel
             </button>
+          </div>
+          <div className="rounded-xl border border-slate-200 bg-white/80 p-3 text-xs text-slate-600">
+            <p className="text-[10px] font-semibold uppercase tracking-[0.2em] text-slate-400">
+              Relationships
+            </p>
+            <div className="mt-2 space-y-2">
+              <div>
+                <p className="text-[10px] font-semibold uppercase tracking-[0.2em] text-slate-400">
+                  Parents
+                </p>
+                {links.parents.length > 0 ? (
+                  <div className="mt-1 space-y-1">
+                    {links.parents.map((item) => (
+                      <div
+                        key={item.id}
+                        className="flex items-center justify-between gap-2 rounded-lg bg-slate-50 px-2 py-1"
+                      >
+                        <span className="truncate text-xs text-slate-700">{item.person.fullName}</span>
+                        {canEdit && (
+                          <button
+                            className="rounded-full border border-rose-200 bg-rose-50 px-2 py-1 text-[10px] font-semibold text-rose-700"
+                            onClick={handleRemoveLink(item.id)}
+                            onMouseDown={(event) => event.stopPropagation()}
+                            type="button"
+                          >
+                            Remove
+                          </button>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <p className="mt-1 text-xs text-slate-400">No parents linked.</p>
+                )}
+                {canEdit && (
+                  <div className="mt-2 flex gap-2">
+                    <select
+                      className="w-full rounded-lg border border-slate-200 px-2 py-1 text-xs"
+                      value={linkState.parentId}
+                      onChange={(event) =>
+                        setLinkState((prev) => ({ ...prev, parentId: event.target.value }))
+                      }
+                      onMouseDown={(event) => event.stopPropagation()}
+                    >
+                      <option value="">Link existing parent</option>
+                      {links.eligibleParents.map((candidate) => (
+                        <option key={candidate.id} value={candidate.id}>
+                          {candidate.fullName}
+                        </option>
+                      ))}
+                    </select>
+                    <button
+                      className="rounded-full bg-slate-900 px-2 py-1 text-[10px] font-semibold text-white disabled:opacity-50"
+                      onClick={handleLinkParent}
+                      onMouseDown={(event) => event.stopPropagation()}
+                      disabled={!linkState.parentId}
+                      type="button"
+                    >
+                      Link
+                    </button>
+                  </div>
+                )}
+              </div>
+              <div>
+                <p className="text-[10px] font-semibold uppercase tracking-[0.2em] text-slate-400">
+                  Children
+                </p>
+                {links.children.length > 0 ? (
+                  <div className="mt-1 space-y-1">
+                    {links.children.map((item) => (
+                      <div
+                        key={item.id}
+                        className="flex items-center justify-between gap-2 rounded-lg bg-slate-50 px-2 py-1"
+                      >
+                        <span className="truncate text-xs text-slate-700">{item.person.fullName}</span>
+                        {canEdit && (
+                          <button
+                            className="rounded-full border border-rose-200 bg-rose-50 px-2 py-1 text-[10px] font-semibold text-rose-700"
+                            onClick={handleRemoveLink(item.id)}
+                            onMouseDown={(event) => event.stopPropagation()}
+                            type="button"
+                          >
+                            Remove
+                          </button>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <p className="mt-1 text-xs text-slate-400">No children linked.</p>
+                )}
+                {canEdit && (
+                  <div className="mt-2 flex gap-2">
+                    <select
+                      className="w-full rounded-lg border border-slate-200 px-2 py-1 text-xs"
+                      value={linkState.childId}
+                      onChange={(event) =>
+                        setLinkState((prev) => ({ ...prev, childId: event.target.value }))
+                      }
+                      onMouseDown={(event) => event.stopPropagation()}
+                    >
+                      <option value="">Link existing child</option>
+                      {links.eligibleChildren.map((candidate) => (
+                        <option key={candidate.id} value={candidate.id}>
+                          {candidate.fullName}
+                        </option>
+                      ))}
+                    </select>
+                    <button
+                      className="rounded-full bg-slate-900 px-2 py-1 text-[10px] font-semibold text-white disabled:opacity-50"
+                      onClick={handleLinkChild}
+                      onMouseDown={(event) => event.stopPropagation()}
+                      disabled={!linkState.childId}
+                      type="button"
+                    >
+                      Link
+                    </button>
+                  </div>
+                )}
+              </div>
+              <div>
+                <p className="text-[10px] font-semibold uppercase tracking-[0.2em] text-slate-400">
+                  Partners
+                </p>
+                {links.partners.length > 0 ? (
+                  <div className="mt-1 space-y-1">
+                    {links.partners.map((item) => (
+                      <div
+                        key={item.id}
+                        className="flex items-center justify-between gap-2 rounded-lg bg-slate-50 px-2 py-1"
+                      >
+                        <span className="truncate text-xs text-slate-700">{item.person.fullName}</span>
+                        {canEdit && (
+                          <button
+                            className="rounded-full border border-rose-200 bg-rose-50 px-2 py-1 text-[10px] font-semibold text-rose-700"
+                            onClick={handleRemoveLink(item.id)}
+                            onMouseDown={(event) => event.stopPropagation()}
+                            type="button"
+                          >
+                            Remove
+                          </button>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <p className="mt-1 text-xs text-slate-400">No partners linked.</p>
+                )}
+                {canEdit && (
+                  <div className="mt-2 flex gap-2">
+                    <select
+                      className="w-full rounded-lg border border-slate-200 px-2 py-1 text-xs"
+                      value={linkState.partnerId}
+                      onChange={(event) =>
+                        setLinkState((prev) => ({ ...prev, partnerId: event.target.value }))
+                      }
+                      onMouseDown={(event) => event.stopPropagation()}
+                    >
+                      <option value="">Link existing partner</option>
+                      {links.eligiblePartners.map((candidate) => (
+                        <option key={candidate.id} value={candidate.id}>
+                          {candidate.fullName}
+                        </option>
+                      ))}
+                    </select>
+                    <button
+                      className="rounded-full bg-slate-900 px-2 py-1 text-[10px] font-semibold text-white disabled:opacity-50"
+                      onClick={handleLinkPartner}
+                      onMouseDown={(event) => event.stopPropagation()}
+                      disabled={!linkState.partnerId}
+                      type="button"
+                    >
+                      Link
+                    </button>
+                  </div>
+                )}
+              </div>
+            </div>
           </div>
         </div>
       ) : (

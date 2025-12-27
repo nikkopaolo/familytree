@@ -27,6 +27,10 @@ type TreeCanvasProps = {
     payload: Record<string, unknown>,
     email?: string
   ) => Promise<void> | void;
+  onDeleteRelationship: (relationshipId: string) => void;
+  onLinkParent: (childId: string, parentId: string) => void;
+  onLinkChild: (parentId: string, childId: string) => void;
+  onLinkPartner: (personId: string, partnerId: string) => void;
   onUpdatePosition: (id: string, x: number, y: number) => void;
   selectedPersonId: string;
   onSelectPerson: (id: string) => void;
@@ -49,6 +53,10 @@ export const TreeCanvas = ({
   onAddChild,
   onAddPartner,
   onUpdatePerson,
+  onDeleteRelationship,
+  onLinkParent,
+  onLinkChild,
+  onLinkPartner,
   onUpdatePosition,
   selectedPersonId,
   onSelectPerson,
@@ -168,6 +176,73 @@ export const TreeCanvas = ({
     );
   }, [persons, relationships]);
 
+  const relationshipDetails = useMemo(() => {
+    const map = new Map<
+      string,
+      {
+        parents: Array<{ id: string; person: Person }>;
+        children: Array<{ id: string; person: Person }>;
+        partners: Array<{ id: string; person: Person }>;
+        eligibleParents: Person[];
+        eligibleChildren: Person[];
+        eligiblePartners: Person[];
+      }
+    >();
+
+    persons.forEach((person) => {
+      map.set(person.id, {
+        parents: [],
+        children: [],
+        partners: [],
+        eligibleParents: [],
+        eligibleChildren: [],
+        eligiblePartners: [],
+      });
+    });
+
+    relationships.forEach((rel) => {
+      if (rel.relationshipType === "parent") {
+        const parent = persons.find((person) => person.id === rel.parentId);
+        const child = persons.find((person) => person.id === rel.childId);
+        if (parent && map.has(rel.childId)) {
+          map.get(rel.childId)?.parents.push({ id: rel.id, person: parent });
+        }
+        if (child && map.has(rel.parentId)) {
+          map.get(rel.parentId)?.children.push({ id: rel.id, person: child });
+        }
+      }
+      if (rel.relationshipType === "partner") {
+        const parent = persons.find((person) => person.id === rel.parentId);
+        const child = persons.find((person) => person.id === rel.childId);
+        if (parent && map.has(rel.childId)) {
+          map.get(rel.childId)?.partners.push({ id: rel.id, person: parent });
+        }
+        if (child && map.has(rel.parentId)) {
+          map.get(rel.parentId)?.partners.push({ id: rel.id, person: child });
+        }
+      }
+    });
+
+    persons.forEach((person) => {
+      const entry = map.get(person.id);
+      if (!entry) return;
+      const parentIds = new Set(entry.parents.map((item) => item.person.id));
+      const childIds = new Set(entry.children.map((item) => item.person.id));
+      const partnerIds = new Set(entry.partners.map((item) => item.person.id));
+      entry.eligibleParents = persons.filter(
+        (candidate) => candidate.id !== person.id && !parentIds.has(candidate.id)
+      );
+      entry.eligibleChildren = persons.filter(
+        (candidate) => candidate.id !== person.id && !childIds.has(candidate.id)
+      );
+      entry.eligiblePartners = persons.filter(
+        (candidate) => candidate.id !== person.id && !partnerIds.has(candidate.id)
+      );
+    });
+
+    return map;
+  }, [persons, relationships]);
+
   const interactiveNodes = useMemo(() => {
     return nodeHighlight.map((node) => {
       if (node.type !== "person") {
@@ -180,26 +255,44 @@ export const TreeCanvas = ({
         partners: 0,
         siblings: 0,
       };
+      const links = relationshipDetails.get(person.id) ?? {
+        parents: [],
+        children: [],
+        partners: [],
+        eligibleParents: [],
+        eligibleChildren: [],
+        eligiblePartners: [],
+      };
       return {
         ...node,
         data: {
           person,
           stats,
+          links,
           canEdit: canEditPerson(person),
           onAddChild: () => onAddChild(person.id),
           onAddPartner: () => onAddPartner(person.id),
           onUpdate: (payload: Record<string, unknown>, email?: string) =>
             onUpdatePerson(person.id, payload, email),
+          onDeleteRelationship,
+          onLinkParent: (parentId: string) => onLinkParent(person.id, parentId),
+          onLinkChild: (childId: string) => onLinkChild(person.id, childId),
+          onLinkPartner: (partnerId: string) => onLinkPartner(person.id, partnerId),
         },
       };
     });
   }, [
     nodeHighlight,
     relationshipStats,
+    relationshipDetails,
     canEditPerson,
     onAddChild,
     onAddPartner,
     onUpdatePerson,
+    onDeleteRelationship,
+    onLinkParent,
+    onLinkChild,
+    onLinkPartner,
   ]);
 
   const handleAutoArrange = async () => {
