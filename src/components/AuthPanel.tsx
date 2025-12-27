@@ -55,11 +55,11 @@ export const AuthPanel = ({
         <h3 className="text-xl text-slate-900">Access Control</h3>
         <span className="inline-flex items-center gap-2 rounded-full bg-emerald-50 px-3 py-1 text-xs font-semibold text-emerald-700">
           <ShieldCheck size={14} />
-          {isGuest ? "Guest Mode" : "Signed In"}
+          {isGuest ? "Viewer" : "Signed In"}
         </span>
       </div>
       <p className="mt-2 text-sm text-slate-600">
-        Sign in to approve changes, manage branches, and upload photos.
+        Sign in to edit members, manage branches, and upload photos.
       </p>
       <div className="mt-4 space-y-3 text-sm">
         {isGuest ? (

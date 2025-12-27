@@ -70,6 +70,7 @@ export default function Home() {
 
   const selectedPerson = clanPersons.find((person) => person.id === selectedPersonId);
   const addChildParent = clanPersons.find((person) => person.id === addChildParentId);
+  const canSuggest = Boolean(membership);
   const canDeleteSelected = selectedPerson ? canEditPerson(selectedPerson) : false;
 
   const addChildPartners = useMemo(() => {
@@ -188,6 +189,7 @@ export default function Home() {
               positions={clanPositions}
               manualPositions={manualPositions}
               canEditPerson={canEditPerson}
+              canSuggest={canSuggest}
               onAddChild={(parentId) => setAddChildParentId(parentId)}
               onAddPartner={async (personId) => {
                 const newPerson = await createPerson({ fullName: "New Member" });
@@ -264,6 +266,7 @@ export default function Home() {
             persons={clanPersons}
             relationships={clanRelationships}
             canEdit={selectedPerson ? canEditPerson(selectedPerson) : false}
+            canSuggest={canSuggest}
             onSubmitUpdate={handleSubmitUpdate}
             onAddParentChild={(parentId, childId) => createParentChildRelationship(parentId, childId)}
             onAddPartner={(personId, partnerId) => createPartnerRelationship(personId, partnerId)}

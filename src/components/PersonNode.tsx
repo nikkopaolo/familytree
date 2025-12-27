@@ -24,6 +24,7 @@ type PersonNodeData = {
     eligiblePartners: Person[];
   };
   canEdit: boolean;
+  canSuggest: boolean;
   onAddChild: () => void;
   onAddPartner: () => void;
   onUpdate: (payload: Record<string, unknown>, email?: string) => Promise<void> | void;
@@ -73,6 +74,7 @@ export const PersonNode = ({ data, selected }: NodeProps<PersonNodeData>) => {
     stats,
     links,
     canEdit,
+    canSuggest,
     onAddChild,
     onAddPartner,
     onUpdate,
@@ -140,8 +142,15 @@ export const PersonNode = ({ data, selected }: NodeProps<PersonNodeData>) => {
     setLinkState({ parentId: "", childId: "", partnerId: "" });
   }, [person.id]);
 
+  useEffect(() => {
+    if (!canSuggest) {
+      setIsEditing(false);
+    }
+  }, [canSuggest]);
+
   const startEditing = (event: MouseEvent<HTMLButtonElement>) => {
     event.stopPropagation();
+    if (!canSuggest) return;
     setSuggestEmail("");
     setFormState({
       fullName: person.fullName,
@@ -290,15 +299,17 @@ export const PersonNode = ({ data, selected }: NodeProps<PersonNodeData>) => {
               >
                 {statusLabel}
               </span>
-              <button
-                className="rounded-full border border-slate-200 bg-white p-1 text-slate-500 transition hover:text-slate-800"
-                onClick={startEditing}
-                type="button"
-                aria-label={canEdit ? "Edit member" : "Suggest edit"}
-                title={canEdit ? "Edit member" : "Suggest edit"}
-              >
-                <Edit3 size={12} />
-              </button>
+              {canSuggest && (
+                <button
+                  className="rounded-full border border-slate-200 bg-white p-1 text-slate-500 transition hover:text-slate-800"
+                  onClick={startEditing}
+                  type="button"
+                  aria-label={canEdit ? "Edit member" : "Suggest edit"}
+                  title={canEdit ? "Edit member" : "Suggest edit"}
+                >
+                  <Edit3 size={12} />
+                </button>
+              )}
             </div>
           </div>
           <p className="mt-1 text-xs text-slate-500">
@@ -473,7 +484,7 @@ export const PersonNode = ({ data, selected }: NodeProps<PersonNodeData>) => {
                 ) : (
                   <p className="mt-1 text-xs text-slate-400">No parents linked.</p>
                 )}
-                {canEdit && (
+                {canEdit && canSuggest && (
                   <div className="mt-2 flex gap-2">
                     <select
                       className="w-full rounded-lg border border-slate-200 px-2 py-1 text-xs"
@@ -530,7 +541,7 @@ export const PersonNode = ({ data, selected }: NodeProps<PersonNodeData>) => {
                 ) : (
                   <p className="mt-1 text-xs text-slate-400">No children linked.</p>
                 )}
-                {canEdit && (
+                {canEdit && canSuggest && (
                   <div className="mt-2 flex gap-2">
                     <select
                       className="w-full rounded-lg border border-slate-200 px-2 py-1 text-xs"
@@ -587,7 +598,7 @@ export const PersonNode = ({ data, selected }: NodeProps<PersonNodeData>) => {
                 ) : (
                   <p className="mt-1 text-xs text-slate-400">No partners linked.</p>
                 )}
-                {canEdit && (
+                {canEdit && canSuggest && (
                   <div className="mt-2 flex gap-2">
                     <select
                       className="w-full rounded-lg border border-slate-200 px-2 py-1 text-xs"
@@ -621,30 +632,30 @@ export const PersonNode = ({ data, selected }: NodeProps<PersonNodeData>) => {
         </div>
       ) : (
         <div className="mt-3 flex gap-2">
-          <button
-            className={`rounded-full px-3 py-1 text-[11px] font-semibold ${
-              canEdit ? "bg-slate-900 text-white" : "bg-slate-200 text-slate-500"
-            }`}
-            onClick={(event) => {
-              event.stopPropagation();
-              if (canEdit) onAddChild();
-            }}
-            type="button"
-          >
-            Add child
-          </button>
-          <button
-            className={`rounded-full px-3 py-1 text-[11px] font-semibold ${
-              canEdit ? "bg-amber-500 text-white" : "bg-slate-200 text-slate-500"
-            }`}
-            onClick={(event) => {
-              event.stopPropagation();
-              if (canEdit) onAddPartner();
-            }}
-            type="button"
-          >
-            Add partner
-          </button>
+          {canEdit && (
+            <>
+              <button
+                className="rounded-full bg-slate-900 px-3 py-1 text-[11px] font-semibold text-white"
+                onClick={(event) => {
+                  event.stopPropagation();
+                  onAddChild();
+                }}
+                type="button"
+              >
+                Add child
+              </button>
+              <button
+                className="rounded-full bg-amber-500 px-3 py-1 text-[11px] font-semibold text-white"
+                onClick={(event) => {
+                  event.stopPropagation();
+                  onAddPartner();
+                }}
+                type="button"
+              >
+                Add partner
+              </button>
+            </>
+          )}
         </div>
       )}
     </div>

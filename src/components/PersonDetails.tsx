@@ -11,6 +11,7 @@ type PersonDetailsProps = {
   persons: Person[];
   relationships: Relationship[];
   canEdit: boolean;
+  canSuggest: boolean;
   onSubmitUpdate: (payload: Record<string, unknown>, email?: string) => void;
   onAddParentChild: (parentId: string, childId: string) => void;
   onAddPartner: (personId: string, partnerId: string) => void;
@@ -24,6 +25,7 @@ export const PersonDetails = ({
   persons,
   relationships,
   canEdit,
+  canSuggest,
   onSubmitUpdate,
   onAddParentChild,
   onAddPartner,
@@ -177,6 +179,12 @@ export const PersonDetails = ({
     });
   }, [person]);
 
+  useEffect(() => {
+    if (!canSuggest) {
+      setOpenForm(false);
+    }
+  }, [canSuggest, personId]);
+
   if (!person) {
     return (
       <aside className="glass-card rounded-3xl p-6">
@@ -245,13 +253,15 @@ export const PersonDetails = ({
           </p>
         </div>
         <div className="flex flex-wrap items-center gap-2">
-          <button
-            className="inline-flex items-center gap-2 rounded-full border border-slate-200 bg-white px-3 py-2 text-xs font-semibold text-slate-600"
-            onClick={() => setOpenForm((prev) => !prev)}
-          >
-            <Edit3 size={14} />
-            {canEdit ? "Update" : "Suggest edit"}
-          </button>
+          {canSuggest && (
+            <button
+              className="inline-flex items-center gap-2 rounded-full border border-slate-200 bg-white px-3 py-2 text-xs font-semibold text-slate-600"
+              onClick={() => setOpenForm((prev) => !prev)}
+            >
+              <Edit3 size={14} />
+              {canEdit ? "Update" : "Suggest edit"}
+            </button>
+          )}
           {canEdit && onDelete && (
             <button
               className="inline-flex items-center gap-2 rounded-full border border-rose-200 bg-rose-50 px-3 py-2 text-xs font-semibold text-rose-700"
@@ -360,29 +370,30 @@ export const PersonDetails = ({
                 <p className="text-sm text-slate-500">No partners linked yet.</p>
               )}
             </div>
-            <div className="mt-2 flex gap-2">
-              <select
-                className="w-full rounded-xl border border-slate-200 px-3 py-2 text-sm"
-                value={selectedPartnerId}
-                onChange={(event) => setSelectedPartnerId(event.target.value)}
-                disabled={!canEdit}
-              >
-                <option value="">Add partner</option>
-                {relationshipSummary.eligiblePartners.map((candidate) => (
-                  <option key={candidate.id} value={candidate.id}>
-                    {candidate.fullName}
-                  </option>
-                ))}
-              </select>
-              <button
-                className="rounded-xl bg-slate-900 px-3 py-2 text-xs font-semibold text-white disabled:opacity-40"
-                onClick={addPartner}
-                disabled={!selectedPartnerId || !canEdit}
-                type="button"
-              >
-                Link
-              </button>
-            </div>
+            {canEdit && (
+              <div className="mt-2 flex gap-2">
+                <select
+                  className="w-full rounded-xl border border-slate-200 px-3 py-2 text-sm"
+                  value={selectedPartnerId}
+                  onChange={(event) => setSelectedPartnerId(event.target.value)}
+                >
+                  <option value="">Add partner</option>
+                  {relationshipSummary.eligiblePartners.map((candidate) => (
+                    <option key={candidate.id} value={candidate.id}>
+                      {candidate.fullName}
+                    </option>
+                  ))}
+                </select>
+                <button
+                  className="rounded-xl bg-slate-900 px-3 py-2 text-xs font-semibold text-white disabled:opacity-40"
+                  onClick={addPartner}
+                  disabled={!selectedPartnerId}
+                  type="button"
+                >
+                  Link
+                </button>
+              </div>
+            )}
           </div>
 
           <div>
@@ -400,29 +411,30 @@ export const PersonDetails = ({
                 <p className="text-sm text-slate-500">No parents linked yet.</p>
               )}
             </div>
-            <div className="mt-2 flex gap-2">
-              <select
-                className="w-full rounded-xl border border-slate-200 px-3 py-2 text-sm"
-                value={selectedParentId}
-                onChange={(event) => setSelectedParentId(event.target.value)}
-                disabled={!canEdit}
-              >
-                <option value="">Add parent</option>
-                {relationshipSummary.eligibleParents.map((candidate) => (
-                  <option key={candidate.id} value={candidate.id}>
-                    {candidate.fullName}
-                  </option>
-                ))}
-              </select>
-              <button
-                className="rounded-xl bg-slate-900 px-3 py-2 text-xs font-semibold text-white disabled:opacity-40"
-                onClick={addParent}
-                disabled={!selectedParentId || !canEdit}
-                type="button"
-              >
-                Link
-              </button>
-            </div>
+            {canEdit && (
+              <div className="mt-2 flex gap-2">
+                <select
+                  className="w-full rounded-xl border border-slate-200 px-3 py-2 text-sm"
+                  value={selectedParentId}
+                  onChange={(event) => setSelectedParentId(event.target.value)}
+                >
+                  <option value="">Add parent</option>
+                  {relationshipSummary.eligibleParents.map((candidate) => (
+                    <option key={candidate.id} value={candidate.id}>
+                      {candidate.fullName}
+                    </option>
+                  ))}
+                </select>
+                <button
+                  className="rounded-xl bg-slate-900 px-3 py-2 text-xs font-semibold text-white disabled:opacity-40"
+                  onClick={addParent}
+                  disabled={!selectedParentId}
+                  type="button"
+                >
+                  Link
+                </button>
+              </div>
+            )}
           </div>
 
           <div className="border-t border-slate-100 pt-3">
@@ -440,29 +452,30 @@ export const PersonDetails = ({
                 <p className="text-sm text-slate-500">No children linked yet.</p>
               )}
             </div>
-            <div className="mt-2 flex gap-2">
-              <select
-                className="w-full rounded-xl border border-slate-200 px-3 py-2 text-sm"
-                value={selectedChildId}
-                onChange={(event) => setSelectedChildId(event.target.value)}
-                disabled={!canEdit}
-              >
-                <option value="">Add child</option>
-                {relationshipSummary.eligibleChildren.map((candidate) => (
-                  <option key={candidate.id} value={candidate.id}>
-                    {candidate.fullName}
-                  </option>
-                ))}
-              </select>
-              <button
-                className="rounded-xl bg-slate-900 px-3 py-2 text-xs font-semibold text-white disabled:opacity-40"
-                onClick={addChild}
-                disabled={!selectedChildId || !canEdit}
-                type="button"
-              >
-                Link
-              </button>
-            </div>
+            {canEdit && (
+              <div className="mt-2 flex gap-2">
+                <select
+                  className="w-full rounded-xl border border-slate-200 px-3 py-2 text-sm"
+                  value={selectedChildId}
+                  onChange={(event) => setSelectedChildId(event.target.value)}
+                >
+                  <option value="">Add child</option>
+                  {relationshipSummary.eligibleChildren.map((candidate) => (
+                    <option key={candidate.id} value={candidate.id}>
+                      {candidate.fullName}
+                    </option>
+                  ))}
+                </select>
+                <button
+                  className="rounded-xl bg-slate-900 px-3 py-2 text-xs font-semibold text-white disabled:opacity-40"
+                  onClick={addChild}
+                  disabled={!selectedChildId}
+                  type="button"
+                >
+                  Link
+                </button>
+              </div>
+            )}
           </div>
           <div className="border-t border-slate-100 pt-3">
             <span className="text-xs font-semibold text-slate-500">Derived</span>
@@ -502,7 +515,7 @@ export const PersonDetails = ({
         </div>
       </div>
 
-      {openForm && (
+      {openForm && canSuggest && (
         <div className="mt-6 rounded-2xl border border-slate-200 bg-white p-4">
           <p className="text-xs font-semibold uppercase tracking-[0.2em] text-slate-500">
             {canEdit ? "Direct Update" : "Suggest Update"}
