@@ -61,6 +61,7 @@ export const TreeCanvas = ({
 }: TreeCanvasProps) => {
   const [direction, setDirection] = useState<TreeLayoutDirection>("TB");
   const [isFullscreen, setIsFullscreen] = useState(false);
+  const [isArranging, setIsArranging] = useState(false);
   const [flowInstance, setFlowInstance] = useState<ReactFlowInstance | null>(null);
   const hasPeople = persons.length > 0;
 
@@ -201,6 +202,28 @@ export const TreeCanvas = ({
     onUpdatePerson,
   ]);
 
+  const handleAutoArrange = async () => {
+    if (isArranging || filteredPersons.length === 0) return;
+    setIsArranging(true);
+    const { nodes: layoutNodes } = buildTreeGraph({
+      persons: filteredPersons,
+      relationships: filteredRelationships,
+      positions: [],
+      direction,
+      manualPositions: {},
+    });
+    const updates = layoutNodes
+      .filter((node) => node.type === "person")
+      .map((node) =>
+        Promise.resolve(onUpdatePosition(node.id, node.position.x, node.position.y))
+      );
+    await Promise.all(updates);
+    setTimeout(() => {
+      flowInstance?.fitView({ padding: 0.2, duration: 300 });
+    }, 50);
+    setIsArranging(false);
+  };
+
   if (!hasPeople) {
     return (
       <section className="glass-card flex h-[640px] flex-col gap-4 rounded-3xl p-6">
@@ -306,6 +329,14 @@ export const TreeCanvas = ({
           </div>
         </div>
         <div className="ml-auto flex flex-wrap items-center gap-3">
+          <button
+            className="rounded-full border border-slate-200 bg-white px-4 py-2 text-xs font-semibold text-slate-600 shadow-sm transition hover:text-slate-900 disabled:cursor-not-allowed disabled:opacity-60"
+            onClick={handleAutoArrange}
+            disabled={isArranging}
+            type="button"
+          >
+            {isArranging ? "Arranging..." : "Auto arrange"}
+          </button>
           <button
             className="rounded-full border border-slate-200 bg-white px-4 py-2 text-xs font-semibold text-slate-600 shadow-sm transition hover:text-slate-900"
             onClick={() => setIsFullscreen((prev) => !prev)}
