@@ -291,86 +291,178 @@ export const buildTreeGraph = ({
     familyLayoutPositions.set(family.id, { x: layout.x, y: layout.y });
   });
 
-  const parentAnchors = new Map<string, Array<{ x: number; y: number }>>();
-  const addAnchor = (personId: string, x: number, y: number) => {
-    const anchors = parentAnchors.get(personId) ?? [];
-    anchors.push({ x, y });
-    parentAnchors.set(personId, anchors);
-  };
+  const familyCenters = new Map<string, { x: number; y: number }>(
+    familyLayoutPositions
+  );
 
+  const familyAdj = new Map<string, string[]>();
   familyById.forEach((family) => {
-    if (family.parents.length === 0) return;
-    const layout = familyLayoutPositions.get(family.id) ?? { x: 0, y: 0 };
-    const parentCount = family.parents.length;
-    if (direction === "TB") {
-      const totalWidth =
-        parentCount * NODE_WIDTH + (parentCount - 1) * FAMILY_PARENT_GAP;
-      const startX = layout.x - totalWidth / 2;
-      const parentY = layout.y - (NODE_HEIGHT / 2 + FAMILY_VERTICAL_GAP);
-      family.parents.forEach((parentId, index) => {
-        const anchorX = startX + index * (NODE_WIDTH + FAMILY_PARENT_GAP);
-        addAnchor(parentId, anchorX, parentY);
-      });
-    } else {
-      const totalHeight =
-        parentCount * NODE_HEIGHT + (parentCount - 1) * FAMILY_PARENT_GAP;
-      const startY = layout.y - totalHeight / 2;
-      const parentX = layout.x - (NODE_WIDTH / 2 + FAMILY_VERTICAL_GAP);
-      family.parents.forEach((parentId, index) => {
-        const anchorY = startY + index * (NODE_HEIGHT + FAMILY_PARENT_GAP);
-        addAnchor(parentId, parentX, anchorY);
-      });
-    }
+    familyAdj.set(family.id, []);
   });
+  familyEdges.forEach((edge) => {
+    familyAdj.get(edge.from)?.push(edge.to);
+  });
+
+  const incomingCounts = new Map(familyIncoming);
+  const familyQueue = [...roots]
+    .sort((left, right) => {
+      const leftPos = familyLayoutPositions.get(left.id) ?? { x: 0, y: 0 };
+      const rightPos = familyLayoutPositions.get(right.id) ?? { x: 0, y: 0 };
+      return direction === "TB" ? leftPos.x - rightPos.x : leftPos.y - rightPos.y;
+    })
+    .map((family) => family.id);
+
+  const orderedFamilyIds: string[] = [];
+  while (familyQueue.length > 0) {
+    const familyId = familyQueue.shift();
+    if (!familyId) break;
+    orderedFamilyIds.push(familyId);
+    const neighbors = familyAdj.get(familyId) ?? [];
+    neighbors.forEach((neighbor) => {
+      const nextCount = (incomingCounts.get(neighbor) ?? 0) - 1;
+      incomingCounts.set(neighbor, nextCount);
+      if (nextCount === 0) {
+        familyQueue.push(neighbor);
+      }
+    });
+  }
+
+  if (orderedFamilyIds.length < familyById.size) {
+    familyById.forEach((family) => {
+      if (!orderedFamilyIds.includes(family.id)) {
+        orderedFamilyIds.push(family.id);
+      }
+    });
+  }
 
   const personPositions = new Map<string, { x: number; y: number }>();
-  parentAnchors.forEach((anchors, personId) => {
-    const avgX = anchors.reduce((acc, item) => acc + item.x, 0) / anchors.length;
-    const avgY = anchors.reduce((acc, item) => acc + item.y, 0) / anchors.length;
-    personPositions.set(personId, { x: avgX, y: avgY });
-  });
 
-  const familyCenters = new Map<string, { x: number; y: number }>();
-  familyById.forEach((family) => {
-    const layout = familyLayoutPositions.get(family.id) ?? { x: 0, y: 0 };
-    if (family.parents.length > 0) {
-      const parentPositions = family.parents
-        .map((parentId) => personPositions.get(parentId))
-        .filter(Boolean) as Array<{ x: number; y: number }>;
-      if (parentPositions.length > 0) {
+  const average = (values: number[]) =>
+    values.reduce((acc, value) => acc + value, 0) / values.length;
+
+  const placeFamily = (family: FamilyUnit) => {
+    let center = familyCenters.get(family.id) ?? { x: 0, y: 0 };
+    const parents = [...family.parents].sort(compareByName);
+    const parentCount = parents.length;
+
+    if (parentCount > 0) {
+      const existingParents = parents.filter((parentId) =>
+        personPositions.has(parentId)
+      );
+
+      if (existingParents.length > 0) {
         if (direction === "TB") {
-          const avgX =
-            parentPositions.reduce((acc, item) => acc + item.x, 0) /
-            parentPositions.length;
-          familyCenters.set(family.id, { x: avgX, y: layout.y });
-          return;
+          const avgParentY = average(
+            existingParents.map((parentId) => personPositions.get(parentId)?.y ?? 0)
+          );
+          center = {
+            x: center.x,
+            y: avgParentY + (NODE_HEIGHT / 2 + FAMILY_VERTICAL_GAP),
+          };
+        } else {
+          const avgParentX = average(
+            existingParents.map((parentId) => personPositions.get(parentId)?.x ?? 0)
+          );
+          center = {
+            x: avgParentX + (NODE_WIDTH / 2 + FAMILY_VERTICAL_GAP),
+            y: center.y,
+          };
         }
-        const avgY =
-          parentPositions.reduce((acc, item) => acc + item.y, 0) /
-          parentPositions.length;
-        familyCenters.set(family.id, { x: layout.x, y: avgY });
-        return;
+      }
+
+      if (direction === "TB") {
+        const totalWidth =
+          parentCount * NODE_WIDTH + (parentCount - 1) * FAMILY_PARENT_GAP;
+        let startX = center.x - totalWidth / 2;
+        const parentY = center.y - (NODE_HEIGHT / 2 + FAMILY_VERTICAL_GAP);
+
+        if (existingParents.length > 0) {
+          const deltas = existingParents.map((parentId) => {
+            const index = parents.indexOf(parentId);
+            if (index < 0) return 0;
+            const desiredX =
+              startX + NODE_WIDTH / 2 + index * (NODE_WIDTH + FAMILY_PARENT_GAP);
+            const actualX = personPositions.get(parentId)?.x ?? desiredX;
+            return actualX - desiredX;
+          });
+          const delta = average(deltas);
+          center = { x: center.x + delta, y: center.y };
+          startX = center.x - totalWidth / 2;
+        }
+
+        parents.forEach((parentId, index) => {
+          const x =
+            startX + NODE_WIDTH / 2 + index * (NODE_WIDTH + FAMILY_PARENT_GAP);
+          personPositions.set(parentId, { x, y: parentY });
+        });
+
+        const avgParentX = average(
+          parents.map((parentId) => personPositions.get(parentId)?.x ?? center.x)
+        );
+        center = { x: avgParentX, y: center.y };
+      } else {
+        const totalHeight =
+          parentCount * NODE_HEIGHT + (parentCount - 1) * FAMILY_PARENT_GAP;
+        let startY = center.y - totalHeight / 2;
+        const parentX = center.x - (NODE_WIDTH / 2 + FAMILY_VERTICAL_GAP);
+
+        if (existingParents.length > 0) {
+          const deltas = existingParents.map((parentId) => {
+            const index = parents.indexOf(parentId);
+            if (index < 0) return 0;
+            const desiredY =
+              startY + NODE_HEIGHT / 2 + index * (NODE_HEIGHT + FAMILY_PARENT_GAP);
+            const actualY = personPositions.get(parentId)?.y ?? desiredY;
+            return actualY - desiredY;
+          });
+          const delta = average(deltas);
+          center = { x: center.x, y: center.y + delta };
+          startY = center.y - totalHeight / 2;
+        }
+
+        parents.forEach((parentId, index) => {
+          const y =
+            startY + NODE_HEIGHT / 2 + index * (NODE_HEIGHT + FAMILY_PARENT_GAP);
+          personPositions.set(parentId, { x: parentX, y });
+        });
+
+        const avgParentY = average(
+          parents.map((parentId) => personPositions.get(parentId)?.y ?? center.y)
+        );
+        center = { x: center.x, y: avgParentY };
       }
     }
-    familyCenters.set(family.id, layout);
-  });
 
-  familyById.forEach((family) => {
-    const center = familyCenters.get(family.id) ?? { x: 0, y: 0 };
-    const leafChildren = family.children.filter(
-      (childId) => !parentAnchors.has(childId)
-    );
-    if (leafChildren.length === 0) return;
-    const sortedChildren = [...leafChildren].sort(compareByName);
+    familyCenters.set(family.id, center);
+
+    if (family.children.length === 0) return;
+
+    const sortedChildren = [...family.children].sort((leftId, rightId) => {
+      const leftPos = personPositions.get(leftId);
+      const rightPos = personPositions.get(rightId);
+      if (leftPos && rightPos) {
+        return direction === "TB" ? leftPos.x - rightPos.x : leftPos.y - rightPos.y;
+      }
+      if (leftPos) return -1;
+      if (rightPos) return 1;
+      return compareByName(leftId, rightId);
+    });
+
     if (direction === "TB") {
       const totalWidth =
         sortedChildren.length * NODE_WIDTH +
         (sortedChildren.length - 1) * FAMILY_CHILD_GAP;
       const startX = center.x - totalWidth / 2;
       const childY = center.y + (NODE_HEIGHT / 2 + FAMILY_VERTICAL_GAP);
+
       sortedChildren.forEach((childId, index) => {
-        if (personPositions.has(childId)) return;
-        const x = startX + index * (NODE_WIDTH + FAMILY_CHILD_GAP);
+        const existing = personPositions.get(childId);
+        if (existing) {
+          personPositions.set(childId, { x: existing.x, y: childY });
+          return;
+        }
+        const x =
+          startX + NODE_WIDTH / 2 + index * (NODE_WIDTH + FAMILY_CHILD_GAP);
         personPositions.set(childId, { x, y: childY });
       });
     } else {
@@ -379,12 +471,24 @@ export const buildTreeGraph = ({
         (sortedChildren.length - 1) * FAMILY_CHILD_GAP;
       const startY = center.y - totalHeight / 2;
       const childX = center.x + (NODE_WIDTH / 2 + FAMILY_VERTICAL_GAP);
+
       sortedChildren.forEach((childId, index) => {
-        if (personPositions.has(childId)) return;
-        const y = startY + index * (NODE_HEIGHT + FAMILY_CHILD_GAP);
+        const existing = personPositions.get(childId);
+        if (existing) {
+          personPositions.set(childId, { x: childX, y: existing.y });
+          return;
+        }
+        const y =
+          startY + NODE_HEIGHT / 2 + index * (NODE_HEIGHT + FAMILY_CHILD_GAP);
         personPositions.set(childId, { x: childX, y });
       });
     }
+  };
+
+  orderedFamilyIds.forEach((familyId) => {
+    const family = familyById.get(familyId);
+    if (!family) return;
+    placeFamily(family);
   });
 
   persons.forEach((person) => {
@@ -516,12 +620,9 @@ export const buildTreeGraph = ({
     fontWeight: 600,
   };
 
-  const familyByPairKey = new Map<string, FamilyUnit>();
-  familyById.forEach((family) => {
-    if (family.parents.length === 2) {
-      familyByPairKey.set(normalizePair(family.parents[0], family.parents[1]), family);
-    }
-  });
+  const explicitPartnerPairs = new Set(
+    partnerLinks.map((rel) => normalizePair(rel.parentId, rel.childId))
+  );
 
   familyById.forEach((family) => {
     family.parents.forEach((parentId) => {
@@ -559,9 +660,11 @@ export const buildTreeGraph = ({
       const sorted = [...family.children]
         .map((childId) => ({
           id: childId,
-          x: resolvedCenters.get(childId)?.x ?? 0,
+          pos: resolvedCenters.get(childId) ?? { x: 0, y: 0 },
         }))
-        .sort((a, b) => a.x - b.x)
+        .sort((left, right) =>
+          direction === "TB" ? left.pos.x - right.pos.x : left.pos.y - right.pos.y
+        )
         .map((item) => item.id);
 
       for (let i = 0; i < sorted.length - 1; i += 1) {
@@ -587,12 +690,36 @@ export const buildTreeGraph = ({
         });
       }
     }
+
+    if (family.parents.length === 2) {
+      const pairKey = normalizePair(family.parents[0], family.parents[1]);
+      if (!explicitPartnerPairs.has(pairKey)) {
+        const edge = getPartnerEdge(family.parents[0], family.parents[1]);
+        partnerEdges.push({
+          id: `partner:${family.id}`,
+          source: edge.source,
+          target: edge.target,
+          sourceHandle: edge.sourceHandle,
+          targetHandle: edge.targetHandle,
+          type: "smoothstep",
+          animated: false,
+          label: "Partner of",
+          labelStyle,
+          labelBgStyle: { fill: "rgba(255, 250, 241, 0.9)" },
+          labelBgPadding: [6, 3] as [number, number],
+          labelBgBorderRadius: 8,
+          className: "edge-partner",
+          style: {
+            stroke: "rgba(234, 179, 8, 0.7)",
+            strokeWidth: 2.5,
+            strokeDasharray: "6 4",
+          },
+        });
+      }
+    }
   });
 
   partnerLinks.forEach((rel) => {
-    const pairKey = normalizePair(rel.parentId, rel.childId);
-    const family = familyByPairKey.get(pairKey);
-    if (family && family.children.length > 0) return;
     const edge = getPartnerEdge(rel.parentId, rel.childId);
     partnerEdges.push({
       id: rel.id,
