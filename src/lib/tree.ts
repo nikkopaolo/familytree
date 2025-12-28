@@ -7,9 +7,9 @@ const NODE_HEIGHT = 170;
 const FAMILY_NODE_SIZE = 12;
 const PARTNER_EDGE_WEIGHT = 8;
 const PARTNER_EDGE_MINLEN = 1;
-const FAMILY_PARENT_GAP = 60;
-const FAMILY_CHILD_GAP = 60;
-const FAMILY_VERTICAL_GAP = 90;
+const FAMILY_PARENT_GAP = 90;
+const FAMILY_CHILD_GAP = 110;
+const FAMILY_VERTICAL_GAP = 120;
 
 export type TreeLayoutDirection = "TB" | "LR";
 export type TreeGenerationDirection = "both" | "forward" | "backward";
@@ -233,8 +233,8 @@ export const buildTreeGraph = ({
   graph.setDefaultEdgeLabel(() => ({}));
   graph.setGraph({
     rankdir: direction,
-    nodesep: direction === "TB" ? 120 : 100,
-    ranksep: direction === "TB" ? 260 : 220,
+    nodesep: direction === "TB" ? 180 : 150,
+    ranksep: direction === "TB" ? 300 : 260,
     edgesep: 40,
     ranker: "network-simplex",
   });

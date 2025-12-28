@@ -214,8 +214,8 @@ export const PersonNode = ({ data, selected }: NodeProps<PersonNodeData>) => {
   };
   return (
     <div
-      className={`react-flow__node-person group relative w-[280px] min-h-[170px] overflow-visible rounded-2xl px-4 py-3 transition hover:z-50 ${
-        isEditing ? "z-50" : "z-0"
+      className={`react-flow__node-person group relative w-[280px] min-h-[170px] overflow-visible rounded-2xl px-4 py-3 transition hover:z-[900] ${
+        isEditing ? "z-[1000]" : "z-0"
       } ${selected ? "ring-2 ring-amber-300" : "ring-0"}`}
       style={isEditing ? { zIndex: 1000 } : undefined}
     >
@@ -227,7 +227,7 @@ export const PersonNode = ({ data, selected }: NodeProps<PersonNodeData>) => {
       <Handle id="partner-bottom" type="source" position={Position.Bottom} style={{ opacity: 0 }} />
       <Handle id="partner-left" type="target" position={Position.Left} style={{ opacity: 0 }} />
       <Handle id="partner-right" type="source" position={Position.Right} style={{ opacity: 0 }} />
-      <div className="pointer-events-none absolute left-full top-3 z-50 hidden w-44 translate-x-2 rounded-2xl border border-slate-200 bg-white/95 p-3 text-xs text-slate-600 shadow-xl backdrop-blur group-hover:block">
+      <div className="pointer-events-none absolute left-full top-3 z-[950] hidden w-44 translate-x-2 rounded-2xl border border-slate-200 bg-white/95 p-3 text-xs text-slate-600 shadow-xl backdrop-blur group-hover:block">
         <p className="text-[11px] font-semibold uppercase tracking-[0.2em] text-slate-400">
           Live stats
         </p>
