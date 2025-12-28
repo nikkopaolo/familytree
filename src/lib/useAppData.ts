@@ -7,6 +7,7 @@ import { isSupabaseConfigured, supabase } from "./supabaseClient";
 import type {
   ChangeEvent,
   Clan,
+  DiffItem,
   Membership,
   Person,
   PersonPosition,
@@ -688,7 +689,7 @@ export const useAppData = () => {
         : {}),
     };
 
-    const diff = [];
+    const diff: DiffItem[] = [];
     if ("marriageDate" in payload) {
       diff.push({
         field: "marriageDate",
