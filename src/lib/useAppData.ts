@@ -1022,10 +1022,6 @@ export const useAppData = () => {
         .from("clans")
         .select("id, name, slug, description, is_public");
       if (error) {
-        const storedId = getStoredClanId();
-        setActiveClanId((prev) =>
-          resolveActiveClanId([], preferredMemberships, prev, storedId)
-        );
         return;
       }
       if (clanRows && clanRows.length > 0) {
@@ -1136,31 +1132,33 @@ export const useAppData = () => {
     if (!isUuid(activeClanId)) return;
 
     const loadClanData = async () => {
-      const { data: personRows } = await client
-        .from("persons")
-        .select("*")
-        .eq("clan_id", activeClanId);
+      const [
+        { data: personRows, error: personError },
+        { data: relationshipRows, error: relationshipError },
+        { data: positionRows, error: positionError },
+      ] = await Promise.all([
+        client.from("persons").select("*").eq("clan_id", activeClanId),
+        client.from("relationships").select("*").eq("clan_id", activeClanId),
+        client.from("person_positions").select("*").eq("clan_id", activeClanId),
+      ]);
+
+      if (personError || relationshipError || positionError) {
+        return;
+      }
+
       setPersons((personRows ?? []).map(mapPersonRow));
-
-      const { data: relationshipRows } = await client
-        .from("relationships")
-        .select("*")
-        .eq("clan_id", activeClanId);
       setRelationships((relationshipRows ?? []).map(mapRelationshipRow));
-
-      const { data: positionRows } = await client
-        .from("person_positions")
-        .select("*")
-        .eq("clan_id", activeClanId);
       setPositions((positionRows ?? []).map(mapPositionRow));
 
       if (!isGuest) {
-        const { data: eventRows } = await client
+        const { data: eventRows, error: eventError } = await client
           .from("change_events")
           .select("*")
           .eq("clan_id", activeClanId)
           .order("created_at", { ascending: false });
-        setChangeEvents((eventRows ?? []).map(mapChangeEventRow));
+        if (!eventError) {
+          setChangeEvents((eventRows ?? []).map(mapChangeEventRow));
+        }
       } else {
         setChangeEvents([]);
       }
