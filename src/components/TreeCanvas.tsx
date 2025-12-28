@@ -11,7 +11,12 @@ import ReactFlow, {
 import "reactflow/dist/style.css";
 import { PersonNode } from "./PersonNode";
 import { FamilyNode } from "./FamilyNode";
-import { buildTreeGraph, filterTree, TreeLayoutDirection } from "@/lib/tree";
+import {
+  buildTreeGraph,
+  filterTree,
+  TreeGenerationDirection,
+  TreeLayoutDirection,
+} from "@/lib/tree";
 import type { Person, PersonPosition, Relationship } from "@/lib/types";
 
 type TreeCanvasProps = {
@@ -81,6 +86,8 @@ export const TreeCanvas = ({
   const [searchQuery, setSearchQuery] = useState("");
   const [pendingFocusId, setPendingFocusId] = useState<string | null>(null);
   const [statusFilter, setStatusFilter] = useState<"all" | "alive" | "deceased">("all");
+  const [generationDirection, setGenerationDirection] =
+    useState<TreeGenerationDirection>("both");
   const [flowInstance, setFlowInstance] = useState<ReactFlowInstance | null>(null);
   const [editingNodeId, setEditingNodeId] = useState("");
   const hasPeople = persons.length > 0;
@@ -109,8 +116,9 @@ export const TreeCanvas = ({
       rootId: rootId || persons[0]?.id || "",
       maxDepth,
       maxNodes,
+      generationDirection,
     });
-  }, [hasPeople, maxDepth, maxNodes, persons, relationships, rootId]);
+  }, [generationDirection, hasPeople, maxDepth, maxNodes, persons, relationships, rootId]);
 
   const { nodes, edges } = useMemo(() => {
     if (!hasPeople) {
@@ -498,6 +506,27 @@ export const TreeCanvas = ({
             />
             No limit
           </label>
+        </div>
+        <div>
+          <p className="text-xs font-semibold uppercase tracking-[0.2em] text-slate-500">
+            Generation
+          </p>
+          <div className="mt-2 flex gap-2">
+            {(["both", "forward", "backward"] as const).map((value) => (
+              <button
+                key={value}
+                className={`rounded-full px-4 py-2 text-xs font-semibold ${
+                  generationDirection === value
+                    ? "bg-amber-500 text-white"
+                    : "bg-white text-slate-600"
+                }`}
+                onClick={() => setGenerationDirection(value)}
+                type="button"
+              >
+                {value === "both" ? "Both" : value === "forward" ? "Forward" : "Backward"}
+              </button>
+            ))}
+          </div>
         </div>
         <div>
           <p className="text-xs font-semibold uppercase tracking-[0.2em] text-slate-500">

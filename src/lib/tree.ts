@@ -5,17 +5,17 @@ import type { Person, Relationship, PersonPosition } from "./types";
 const NODE_WIDTH = 280;
 const NODE_HEIGHT = 170;
 const FAMILY_NODE_SIZE = 12;
-const PARTNER_EDGE_WEIGHT = 4;
-const PARTNER_EDGE_MINLEN = 1;
 const PARENT_EDGE_MINLEN = 1;
 const CHILD_EDGE_MINLEN = 1;
 
 export type TreeLayoutDirection = "TB" | "LR";
+export type TreeGenerationDirection = "both" | "forward" | "backward";
 
 export type TreeFilter = {
   rootId: string;
   maxDepth: number;
   maxNodes: number;
+  generationDirection: TreeGenerationDirection;
 };
 
 const buildPositionMap = (positions: PersonPosition[]) =>
@@ -36,9 +36,14 @@ export const filterTree = (
     adjacency.get(fromId)?.push(toId);
   };
 
+  const traversalMode = filter.rootId === "all" ? "both" : filter.generationDirection;
   parentLinks.forEach((rel) => {
-    addAdjacency(rel.parentId, rel.childId);
-    addAdjacency(rel.childId, rel.parentId);
+    if (traversalMode === "forward" || traversalMode === "both") {
+      addAdjacency(rel.parentId, rel.childId);
+    }
+    if (traversalMode === "backward" || traversalMode === "both") {
+      addAdjacency(rel.childId, rel.parentId);
+    }
   });
 
   const selected = new Set<string>();
@@ -106,9 +111,9 @@ export const buildTreeGraph = ({
   graph.setDefaultEdgeLabel(() => ({}));
   graph.setGraph({
     rankdir: direction,
-    nodesep: direction === "TB" ? 90 : 70,
-    ranksep: direction === "TB" ? 190 : 140,
-    edgesep: 20,
+    nodesep: direction === "TB" ? 120 : 90,
+    ranksep: direction === "TB" ? 220 : 170,
+    edgesep: 30,
     ranker: "tight-tree",
   });
 
@@ -141,6 +146,7 @@ export const buildTreeGraph = ({
     string,
     { id: string; parentA: string; parentB: string; children: Set<string> }
   >();
+  const partnerGroups = new Map<string, { id: string; parentA: string; parentB: string }>();
   const familyParentChildPairs = new Set<string>();
 
   parentsByChild.forEach((parentIds, childId) => {
@@ -176,13 +182,25 @@ export const buildTreeGraph = ({
     graph.setNode(group.id, { width: FAMILY_NODE_SIZE, height: FAMILY_NODE_SIZE });
     graph.setEdge(group.parentA, group.id, { weight: 1.2, minlen: 1 });
     graph.setEdge(group.parentB, group.id, { weight: 1.2, minlen: 1 });
-    graph.setEdge(group.parentA, group.parentB, {
-      weight: PARTNER_EDGE_WEIGHT,
-      minlen: PARTNER_EDGE_MINLEN,
-    });
     group.children.forEach((childId) => {
       graph.setEdge(group.id, childId, { weight: 2, minlen: CHILD_EDGE_MINLEN });
     });
+  });
+
+  partnerLinks.forEach((rel) => {
+    const pairKey = normalizePair(rel.parentId, rel.childId);
+    if (familyGroups.has(pairKey) || partnerGroups.has(pairKey)) return;
+    partnerGroups.set(pairKey, {
+      id: `partner:${pairKey}`,
+      parentA: rel.parentId,
+      parentB: rel.childId,
+    });
+  });
+
+  partnerGroups.forEach((group) => {
+    graph.setNode(group.id, { width: FAMILY_NODE_SIZE, height: FAMILY_NODE_SIZE });
+    graph.setEdge(group.parentA, group.id, { weight: 1.8, minlen: 1 });
+    graph.setEdge(group.parentB, group.id, { weight: 1.8, minlen: 1 });
   });
 
   parentLinks.forEach((rel) => {
@@ -190,12 +208,6 @@ export const buildTreeGraph = ({
     graph.setEdge(rel.parentId, rel.childId, {
       weight: 1.5,
       minlen: PARENT_EDGE_MINLEN,
-    });
-  });
-  partnerLinks.forEach((rel) => {
-    graph.setEdge(rel.parentId, rel.childId, {
-      weight: PARTNER_EDGE_WEIGHT,
-      minlen: PARTNER_EDGE_MINLEN,
     });
   });
 
