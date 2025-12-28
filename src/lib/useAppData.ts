@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { diffPerson } from "./diff";
 import { initialData } from "./initialData";
 import { isSupabaseConfigured, supabase } from "./supabaseClient";
@@ -189,6 +189,11 @@ export const useAppData = () => {
   const [adminBootstrapError, setAdminBootstrapError] = useState("");
 
   const isSupabaseEnabled = Boolean(isSupabaseConfigured && supabase);
+  const membershipsRef = useRef(memberships);
+
+  useEffect(() => {
+    membershipsRef.current = memberships;
+  }, [memberships]);
 
   useEffect(() => {
     if (!isSupabaseEnabled) return;
@@ -1015,7 +1020,7 @@ export const useAppData = () => {
   };
 
   const loadClans = useCallback(
-    async (preferredMemberships: Membership[] = memberships) => {
+    async (preferredMemberships?: Membership[]) => {
       const client = supabase;
       if (!isSupabaseEnabled || !client) return;
       const { data: clanRows, error } = await client
@@ -1033,12 +1038,13 @@ export const useAppData = () => {
         }));
         setClans(mapped);
         const storedId = getStoredClanId();
+        const membershipList = preferredMemberships ?? membershipsRef.current;
         setActiveClanId((prev) =>
-          resolveActiveClanId(mapped, preferredMemberships, prev, storedId)
+          resolveActiveClanId(mapped, membershipList, prev, storedId)
         );
       }
     },
-    [isSupabaseEnabled, memberships]
+    [isSupabaseEnabled]
   );
 
   useEffect(() => {
@@ -1112,10 +1118,6 @@ export const useAppData = () => {
       listener.subscription.unsubscribe();
     };
   }, [bootstrapAdmin, isSupabaseEnabled, loadClans]);
-
-  useEffect(() => {
-    loadClans();
-  }, [currentUser.id, loadClans]);
 
   useEffect(() => {
     if (!isSupabaseEnabled) return;
