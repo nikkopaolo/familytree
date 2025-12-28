@@ -40,6 +40,7 @@ export type Relationship = {
   parentId: string;
   childId: string;
   relationshipType: "parent" | "partner";
+  marriageDate?: string;
 };
 
 export type PersonPosition = {

@@ -44,6 +44,7 @@ export default function Home() {
     createPerson,
     createParentChildRelationship,
     createPartnerRelationship,
+    updateRelationship,
     deleteRelationship,
     wipeClanData,
     inviteAdmin,
@@ -198,8 +199,8 @@ export default function Home() {
               onLinkChild={(parentId, childId) =>
                 createParentChildRelationship(parentId, childId)
               }
-              onLinkPartner={(personId, partnerId) =>
-                createPartnerRelationship(personId, partnerId)
+              onLinkPartner={(personId, partnerId, marriageDate) =>
+                createPartnerRelationship(personId, partnerId, marriageDate)
               }
               onUpdatePosition={updateManualPosition}
               selectedPersonId={selectedPersonId}
@@ -262,7 +263,10 @@ export default function Home() {
             canEdit={selectedPerson ? canEditPerson(selectedPerson) : false}
             onSubmitUpdate={handleSubmitUpdate}
             onAddParentChild={(parentId, childId) => createParentChildRelationship(parentId, childId)}
-            onAddPartner={(personId, partnerId) => createPartnerRelationship(personId, partnerId)}
+            onAddPartner={(personId, partnerId, marriageDate) =>
+              createPartnerRelationship(personId, partnerId, marriageDate)
+            }
+            onUpdateRelationship={updateRelationship}
             onDelete={deletePerson}
             canUploadPhoto={Boolean(selectedPerson && canEditPerson(selectedPerson) && isSupabaseEnabled && !isGuest)}
             onUploadPhoto={

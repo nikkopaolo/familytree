@@ -31,7 +31,11 @@ type TreeCanvasProps = {
   onDeleteRelationship: (relationshipId: string) => void;
   onLinkParent: (childId: string, parentId: string) => void;
   onLinkChild: (parentId: string, childId: string) => void;
-  onLinkPartner: (personId: string, partnerId: string) => void;
+  onLinkPartner: (
+    personId: string,
+    partnerId: string,
+    marriageDate?: string | null
+  ) => void;
   onUpdatePosition: (id: string, x: number, y: number) => void;
   selectedPersonId: string;
   onSelectPerson: (id: string) => void;
@@ -254,7 +258,7 @@ export const TreeCanvas = ({
       {
         parents: Array<{ id: string; person: Person }>;
         children: Array<{ id: string; person: Person }>;
-        partners: Array<{ id: string; person: Person }>;
+        partners: Array<{ id: string; person: Person; marriageDate?: string }>;
         eligibleParents: Person[];
         eligibleChildren: Person[];
         eligiblePartners: Person[];
@@ -287,10 +291,18 @@ export const TreeCanvas = ({
         const parent = persons.find((person) => person.id === rel.parentId);
         const child = persons.find((person) => person.id === rel.childId);
         if (parent && map.has(rel.childId)) {
-          map.get(rel.childId)?.partners.push({ id: rel.id, person: parent });
+          map.get(rel.childId)?.partners.push({
+            id: rel.id,
+            person: parent,
+            marriageDate: rel.marriageDate,
+          });
         }
         if (child && map.has(rel.parentId)) {
-          map.get(rel.parentId)?.partners.push({ id: rel.id, person: child });
+          map.get(rel.parentId)?.partners.push({
+            id: rel.id,
+            person: child,
+            marriageDate: rel.marriageDate,
+          });
         }
       }
     });
@@ -360,7 +372,8 @@ export const TreeCanvas = ({
           onDeleteRelationship,
           onLinkParent: (parentId: string) => onLinkParent(person.id, parentId),
           onLinkChild: (childId: string) => onLinkChild(person.id, childId),
-          onLinkPartner: (partnerId: string) => onLinkPartner(person.id, partnerId),
+          onLinkPartner: (partnerId: string, marriageDate?: string | null) =>
+            onLinkPartner(person.id, partnerId, marriageDate),
         },
       };
     });

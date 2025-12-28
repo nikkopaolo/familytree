@@ -49,6 +49,10 @@ export const StatsPanel = ({ persons, relationships = [] }: StatsPanelProps) => 
   const [selectedLocation, setSelectedLocation] = useState<string | null>(null);
   const [familyPage, setFamilyPage] = useState(1);
   const familyPageSize = 5;
+  const personById = useMemo(
+    () => new Map(persons.map((person) => [person.id, person])),
+    [persons]
+  );
 
   const aliveBreakdown = [
     { name: "Alive", value: aliveCount },
@@ -143,6 +147,58 @@ export const StatsPanel = ({ persons, relationships = [] }: StatsPanelProps) => 
       )
       .sort((a, b) => (a?.day ?? 0) - (b?.day ?? 0));
   }, [persons, selectedMonth]);
+
+  const selectedMonthDeaths = useMemo(() => {
+    if (selectedMonth === null) return [];
+    return persons
+      .filter((person) => person.deathDate)
+      .map((person) => {
+        const parsed = parseISO(person.deathDate ?? "");
+        if (!isValid(parsed)) return null;
+        if (getMonth(parsed) !== selectedMonth) return null;
+        return {
+          person,
+          day: parsed.getDate(),
+          year: parsed.getFullYear(),
+        };
+      })
+      .filter(
+        (entry): entry is { person: Person; day: number; year: number } =>
+          entry !== null
+      )
+      .sort((a, b) => a.day - b.day);
+  }, [persons, selectedMonth]);
+
+  const selectedMonthMarriages = useMemo(() => {
+    if (selectedMonth === null) return [];
+    return relationships
+      .filter((rel) => rel.relationshipType === "partner" && rel.marriageDate)
+      .map((rel) => {
+        const parsed = parseISO(rel.marriageDate ?? "");
+        if (!isValid(parsed)) return null;
+        if (getMonth(parsed) !== selectedMonth) return null;
+        const parent = personById.get(rel.parentId);
+        const child = personById.get(rel.childId);
+        const label = `${parent?.fullName ?? "Unknown member"} & ${child?.fullName ?? "Unknown member"}`;
+        return {
+          relationship: rel,
+          label,
+          day: parsed.getDate(),
+          year: parsed.getFullYear(),
+        };
+      })
+      .filter(
+        (
+          entry
+        ): entry is {
+          relationship: Relationship;
+          label: string;
+          day: number;
+          year: number;
+        } => entry !== null
+      )
+      .sort((a, b) => a.day - b.day);
+  }, [personById, relationships, selectedMonth]);
 
   const birthsByDecade = useMemo(() => {
     const counts = new Map<number, number>();
@@ -399,7 +455,7 @@ export const StatsPanel = ({ persons, relationships = [] }: StatsPanelProps) => 
             <div>
               <h2 className="text-2xl text-slate-900">Birthdays Across the Year</h2>
               <p className="text-sm text-slate-600">
-                Click a month to see members celebrating.
+                Click a month to see birthdays and anniversaries.
               </p>
             </div>
             <button
@@ -460,6 +516,67 @@ export const StatsPanel = ({ persons, relationships = [] }: StatsPanelProps) => 
                     </div>
                   );
                 })}
+              </div>
+            )}
+          </div>
+          <div className="mt-4 rounded-2xl border border-slate-200 bg-white/80 p-4">
+            <p className="text-xs font-semibold uppercase tracking-[0.2em] text-slate-500">
+              {selectedMonth === null
+                ? "Select a month"
+                : `${new Date(0, selectedMonth).toLocaleString("en-US", {
+                    month: "long",
+                  })} anniversaries`}
+            </p>
+            {selectedMonth === null ? (
+              <p className="mt-2 text-sm text-slate-600">
+                Pick a bar to see memorials and marriage anniversaries.
+              </p>
+            ) : (
+              <div className="mt-3 space-y-4 text-sm text-slate-700">
+                <div>
+                  <p className="text-[10px] font-semibold uppercase tracking-[0.2em] text-slate-400">
+                    Death anniversaries
+                  </p>
+                  <div className="mt-2 max-h-40 space-y-2 overflow-auto">
+                    {selectedMonthDeaths.length === 0 && (
+                      <p className="text-sm text-slate-500">No memorials for this month.</p>
+                    )}
+                    {selectedMonthDeaths.map((entry) => (
+                      <div
+                        key={entry.person.id}
+                        className="flex items-center justify-between gap-3"
+                      >
+                        <span className="font-semibold text-slate-800">
+                          {entry.person.fullName}
+                        </span>
+                        <span className="text-xs text-slate-500">
+                          Day {entry.day} - {entry.year}
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+                <div>
+                  <p className="text-[10px] font-semibold uppercase tracking-[0.2em] text-slate-400">
+                    Marriage anniversaries
+                  </p>
+                  <div className="mt-2 max-h-40 space-y-2 overflow-auto">
+                    {selectedMonthMarriages.length === 0 && (
+                      <p className="text-sm text-slate-500">No anniversaries for this month.</p>
+                    )}
+                    {selectedMonthMarriages.map((entry) => (
+                      <div
+                        key={entry.relationship.id}
+                        className="flex items-center justify-between gap-3"
+                      >
+                        <span className="font-semibold text-slate-800">{entry.label}</span>
+                        <span className="text-xs text-slate-500">
+                          Day {entry.day} - {entry.year}
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
               </div>
             )}
           </div>

@@ -149,7 +149,14 @@ export const exportGedcom = (persons: Person[], relationships: Relationship[]) =
   const normalizePair = (left: string, right: string) =>
     left < right ? `${left}|${right}` : `${right}|${left}`;
   const partnerPairs = new Set<string>();
-  partnerLinks.forEach((rel) => partnerPairs.add(normalizePair(rel.parentId, rel.childId)));
+  const marriageDatesByPair = new Map<string, string>();
+  partnerLinks.forEach((rel) => {
+    const key = normalizePair(rel.parentId, rel.childId);
+    partnerPairs.add(key);
+    if (rel.marriageDate && !marriageDatesByPair.has(key)) {
+      marriageDatesByPair.set(key, rel.marriageDate);
+    }
+  });
 
   const familyMap = new Map<
     string,
@@ -246,6 +253,11 @@ export const exportGedcom = (persons: Person[], relationships: Relationship[]) =
         lines.push(`1 ${gender.startsWith("m") ? "HUSB" : "WIFE"} @${personId}@`);
       }
     }
+    const marriageDate = marriageDatesByPair.get(key);
+    if (marriageDate) {
+      lines.push("1 MARR");
+      lines.push(`2 DATE ${formatGedcomDate(marriageDate)}`);
+    }
     family.children.forEach((childId) => {
       const childGedId = personIdMap.get(childId);
       if (childGedId) {
@@ -272,12 +284,13 @@ export const parseGedcom = (gedcom: string) => {
   >();
   const families = new Map<
     string,
-    { id: string; husb?: string; wife?: string; children: string[] }
+    { id: string; husb?: string; wife?: string; children: string[]; marriageDate?: string }
   >();
 
   let currentIndi: string | null = null;
   let currentFam: string | null = null;
   let activeDateType: "birth" | "death" | null = null;
+  let activeFamDateType: "marriage" | null = null;
 
   lines.forEach((line) => {
     const trimmed = line.trim();
@@ -289,6 +302,7 @@ export const parseGedcom = (gedcom: string) => {
       currentIndi = null;
       currentFam = null;
       activeDateType = null;
+      activeFamDateType = null;
       if (parts[1]?.startsWith("@") && parts[2] === "INDI") {
         currentIndi = parts[1].replace(/@/g, "");
         individuals.set(currentIndi, {
@@ -336,6 +350,12 @@ export const parseGedcom = (gedcom: string) => {
         fam.wife = value.replace(/@/g, "");
       } else if (tag === "CHIL") {
         fam.children.push(value.replace(/@/g, ""));
+      } else if (tag === "MARR") {
+        activeFamDateType = "marriage";
+      } else if (tag === "DATE" && activeFamDateType === "marriage") {
+        const parsed = parseGedcomDate(value);
+        if (parsed) fam.marriageDate = parsed;
+        activeFamDateType = null;
       }
     }
   });
@@ -368,6 +388,7 @@ export const parseGedcom = (gedcom: string) => {
         parentId: husbId,
         childId: wifeId,
         relationshipType: "partner",
+        marriageDate: fam.marriageDate,
       });
     }
     fam.children.forEach((childGedId) => {

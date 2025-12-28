@@ -18,7 +18,7 @@ type PersonNodeData = {
   links: {
     parents: Array<{ id: string; person: Person }>;
     children: Array<{ id: string; person: Person }>;
-    partners: Array<{ id: string; person: Person }>;
+    partners: Array<{ id: string; person: Person; marriageDate?: string }>;
     eligibleParents: Person[];
     eligibleChildren: Person[];
     eligiblePartners: Person[];
@@ -31,7 +31,7 @@ type PersonNodeData = {
   onDeleteRelationship: (relationshipId: string) => void;
   onLinkParent: (parentId: string) => void;
   onLinkChild: (childId: string) => void;
-  onLinkPartner: (partnerId: string) => void;
+  onLinkPartner: (partnerId: string, marriageDate?: string | null) => void;
 };
 
 const MaleIcon = ({ className }: { className?: string }) => (
@@ -111,6 +111,7 @@ export const PersonNode = ({ data, selected }: NodeProps<PersonNodeData>) => {
     parentId: "",
     childId: "",
     partnerId: "",
+    partnerMarriageDate: "",
   });
 
   useEffect(() => {
@@ -137,7 +138,7 @@ export const PersonNode = ({ data, selected }: NodeProps<PersonNodeData>) => {
   useEffect(() => {
     setIsEditing(false);
     setIsSaving(false);
-    setLinkState({ parentId: "", childId: "", partnerId: "" });
+    setLinkState({ parentId: "", childId: "", partnerId: "", partnerMarriageDate: "" });
   }, [person.id]);
 
   useEffect(() => {
@@ -208,8 +209,8 @@ export const PersonNode = ({ data, selected }: NodeProps<PersonNodeData>) => {
   const handleLinkPartner = (event: MouseEvent<HTMLButtonElement>) => {
     event.stopPropagation();
     if (!linkState.partnerId) return;
-    onLinkPartner(linkState.partnerId);
-    setLinkState((prev) => ({ ...prev, partnerId: "" }));
+    onLinkPartner(linkState.partnerId, linkState.partnerMarriageDate || null);
+    setLinkState((prev) => ({ ...prev, partnerId: "", partnerMarriageDate: "" }));
   };
   return (
     <div
@@ -566,7 +567,16 @@ export const PersonNode = ({ data, selected }: NodeProps<PersonNodeData>) => {
                         key={item.id}
                         className="flex items-center justify-between gap-2 rounded-lg bg-slate-50 px-2 py-1"
                       >
-                        <span className="truncate text-xs text-slate-700">{item.person.fullName}</span>
+                        <div className="min-w-0">
+                          <span className="block truncate text-xs text-slate-700">
+                            {item.person.fullName}
+                          </span>
+                          {item.marriageDate && (
+                            <span className="text-[10px] text-slate-400">
+                              Married {formatDate(item.marriageDate)}
+                            </span>
+                          )}
+                        </div>
                         {canEdit && (
                           <button
                             className="rounded-full border border-rose-200 bg-rose-50 px-2 py-1 text-[10px] font-semibold text-rose-700"
@@ -584,31 +594,47 @@ export const PersonNode = ({ data, selected }: NodeProps<PersonNodeData>) => {
                   <p className="mt-1 text-xs text-slate-400">No partners linked.</p>
                 )}
                 {canEdit && (
-                  <div className="mt-2 flex gap-2">
-                    <select
+                  <div className="mt-2 grid gap-2">
+                    <div className="flex gap-2">
+                      <select
+                        className="w-full rounded-lg border border-slate-200 px-2 py-1 text-xs"
+                        value={linkState.partnerId}
+                        onChange={(event) =>
+                          setLinkState((prev) => ({ ...prev, partnerId: event.target.value }))
+                        }
+                        onMouseDown={(event) => event.stopPropagation()}
+                      >
+                        <option value="">Link existing partner</option>
+                        {links.eligiblePartners.map((candidate) => (
+                          <option key={candidate.id} value={candidate.id}>
+                            {candidate.fullName}
+                          </option>
+                        ))}
+                      </select>
+                      <button
+                        className="rounded-full bg-slate-900 px-2 py-1 text-[10px] font-semibold text-white disabled:opacity-50"
+                        onClick={handleLinkPartner}
+                        onMouseDown={(event) => event.stopPropagation()}
+                        disabled={!linkState.partnerId}
+                        type="button"
+                      >
+                        Link
+                      </button>
+                    </div>
+                    <input
+                      type="date"
                       className="w-full rounded-lg border border-slate-200 px-2 py-1 text-xs"
-                      value={linkState.partnerId}
+                      value={linkState.partnerMarriageDate}
+                      aria-label="Marriage date (optional)"
+                      title="Marriage date (optional)"
                       onChange={(event) =>
-                        setLinkState((prev) => ({ ...prev, partnerId: event.target.value }))
+                        setLinkState((prev) => ({
+                          ...prev,
+                          partnerMarriageDate: event.target.value,
+                        }))
                       }
                       onMouseDown={(event) => event.stopPropagation()}
-                    >
-                      <option value="">Link existing partner</option>
-                      {links.eligiblePartners.map((candidate) => (
-                        <option key={candidate.id} value={candidate.id}>
-                          {candidate.fullName}
-                        </option>
-                      ))}
-                    </select>
-                    <button
-                      className="rounded-full bg-slate-900 px-2 py-1 text-[10px] font-semibold text-white disabled:opacity-50"
-                      onClick={handleLinkPartner}
-                      onMouseDown={(event) => event.stopPropagation()}
-                      disabled={!linkState.partnerId}
-                      type="button"
-                    >
-                      Link
-                    </button>
+                    />
                   </div>
                 )}
               </div>

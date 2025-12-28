@@ -13,7 +13,12 @@ type PersonDetailsProps = {
   canEdit: boolean;
   onSubmitUpdate: (payload: Record<string, unknown>) => void;
   onAddParentChild: (parentId: string, childId: string) => void;
-  onAddPartner: (personId: string, partnerId: string) => void;
+  onAddPartner: (
+    personId: string,
+    partnerId: string,
+    marriageDate?: string | null
+  ) => void;
+  onUpdateRelationship: (relationshipId: string, payload: Record<string, unknown>) => void;
   onDelete?: (personId: string) => void;
   canUploadPhoto?: boolean;
   onUploadPhoto?: (file: File) => Promise<{ error?: string }>;
@@ -27,6 +32,7 @@ export const PersonDetails = ({
   onSubmitUpdate,
   onAddParentChild,
   onAddPartner,
+  onUpdateRelationship,
   onDelete,
   canUploadPhoto = false,
   onUploadPhoto,
@@ -36,6 +42,8 @@ export const PersonDetails = ({
   const [selectedParentId, setSelectedParentId] = useState("");
   const [selectedChildId, setSelectedChildId] = useState("");
   const [selectedPartnerId, setSelectedPartnerId] = useState("");
+  const [selectedPartnerMarriageDate, setSelectedPartnerMarriageDate] = useState("");
+  const [partnerDateDrafts, setPartnerDateDrafts] = useState<Record<string, string>>({});
   const [formState, setFormState] = useState({
     fullName: "",
     isAlive: true,
@@ -56,7 +64,7 @@ export const PersonDetails = ({
       return {
         parents: [] as Person[],
         children: [] as Person[],
-        partners: [] as Person[],
+        partners: [] as Array<{ person: Person; relationship: Relationship }>,
         siblings: [] as Person[],
         auntsUncles: [] as Person[],
         niecesNephews: [] as Person[],
@@ -87,11 +95,19 @@ export const PersonDetails = ({
       .filter(isPerson)
       .sort(sortByName);
     const partners = partnerLinks
-      .map((rel) =>
-        persons.find((p) => p.id === (rel.parentId === personId ? rel.childId : rel.parentId))
+      .map((rel) => {
+        const partner = persons.find(
+          (p) => p.id === (rel.parentId === personId ? rel.childId : rel.parentId)
+        );
+        if (!partner) return null;
+        return { person: partner, relationship: rel };
+      })
+      .filter(
+        (
+          value
+        ): value is { person: Person; relationship: Relationship } => Boolean(value)
       )
-      .filter(isPerson)
-      .sort(sortByName);
+      .sort((a, b) => sortByName(a.person, b.person));
 
     const parentIdSet = new Set(parentLinks.map((rel) => rel.parentId));
     const childIdSet = new Set(childLinks.map((rel) => rel.childId));
@@ -183,7 +199,26 @@ export const PersonDetails = ({
       deathDate: person.deathDate ?? "",
       gender: person.gender ?? "",
     });
+    setSelectedParentId("");
+    setSelectedChildId("");
+    setSelectedPartnerId("");
+    setSelectedPartnerMarriageDate("");
   }, [person]);
+
+  useEffect(() => {
+    if (!personId) return;
+    const drafts: Record<string, string> = {};
+    relationships
+      .filter(
+        (rel) =>
+          rel.relationshipType === "partner" &&
+          (rel.parentId === personId || rel.childId === personId)
+      )
+      .forEach((rel) => {
+        drafts[rel.id] = rel.marriageDate ?? "";
+      });
+    setPartnerDateDrafts(drafts);
+  }, [personId, relationships]);
 
 
   if (!person) {
@@ -239,8 +274,9 @@ export const PersonDetails = ({
 
   const addPartner = () => {
     if (!selectedPartnerId) return;
-    onAddPartner(personId, selectedPartnerId);
+    onAddPartner(personId, selectedPartnerId, selectedPartnerMarriageDate || null);
     setSelectedPartnerId("");
+    setSelectedPartnerMarriageDate("");
   };
 
   return (
@@ -360,39 +396,94 @@ export const PersonDetails = ({
             <span className="text-xs font-semibold text-slate-500">Partners</span>
             <div className="mt-1">
               {relationshipSummary.partners.length > 0 ? (
-                <ul className="space-y-1 text-sm">
-                  {relationshipSummary.partners.map((partner) => (
-                    <li key={partner.id} className="text-slate-700">
-                      {partner.fullName}
-                    </li>
-                  ))}
+                <ul className="space-y-2 text-sm">
+                  {relationshipSummary.partners.map((entry) => {
+                    const dateValue =
+                      partnerDateDrafts[entry.relationship.id] ??
+                      entry.relationship.marriageDate ??
+                      "";
+                    return (
+                      <li key={entry.relationship.id} className="text-slate-700">
+                        <div className="flex items-center justify-between gap-3">
+                          <span className="font-semibold text-slate-800">
+                            {entry.person.fullName}
+                          </span>
+                          <span className="text-xs text-slate-500">
+                            {entry.relationship.marriageDate
+                              ? `Married ${formatDate(entry.relationship.marriageDate)}`
+                              : "Marriage date unknown"}
+                          </span>
+                        </div>
+                        {canEdit && (
+                          <div className="mt-2 flex flex-wrap gap-2">
+                            <input
+                              type="date"
+                              className="rounded-xl border border-slate-200 px-3 py-2 text-xs"
+                              value={dateValue}
+                              onChange={(event) =>
+                                setPartnerDateDrafts((prev) => ({
+                                  ...prev,
+                                  [entry.relationship.id]: event.target.value,
+                                }))
+                              }
+                            />
+                            <button
+                              className="rounded-xl bg-slate-900 px-3 py-2 text-xs font-semibold text-white disabled:opacity-40"
+                              onClick={() =>
+                                onUpdateRelationship(entry.relationship.id, {
+                                  marriageDate: dateValue || null,
+                                })
+                              }
+                              disabled={
+                                dateValue === (entry.relationship.marriageDate ?? "")
+                              }
+                              type="button"
+                            >
+                              Save
+                            </button>
+                          </div>
+                        )}
+                      </li>
+                    );
+                  })}
                 </ul>
               ) : (
                 <p className="text-sm text-slate-500">No partners linked yet.</p>
               )}
             </div>
             {canEdit && (
-              <div className="mt-2 flex gap-2">
-                <select
+              <div className="mt-2 grid gap-2">
+                <div className="flex gap-2">
+                  <select
+                    className="w-full rounded-xl border border-slate-200 px-3 py-2 text-sm"
+                    value={selectedPartnerId}
+                    onChange={(event) => setSelectedPartnerId(event.target.value)}
+                  >
+                    <option value="">Add partner</option>
+                    {relationshipSummary.eligiblePartners.map((candidate) => (
+                      <option key={candidate.id} value={candidate.id}>
+                        {candidate.fullName}
+                      </option>
+                    ))}
+                  </select>
+                  <button
+                    className="rounded-xl bg-slate-900 px-3 py-2 text-xs font-semibold text-white disabled:opacity-40"
+                    onClick={addPartner}
+                    disabled={!selectedPartnerId}
+                    type="button"
+                  >
+                    Link
+                  </button>
+                </div>
+                <input
+                  type="date"
                   className="w-full rounded-xl border border-slate-200 px-3 py-2 text-sm"
-                  value={selectedPartnerId}
-                  onChange={(event) => setSelectedPartnerId(event.target.value)}
-                >
-                  <option value="">Add partner</option>
-                  {relationshipSummary.eligiblePartners.map((candidate) => (
-                    <option key={candidate.id} value={candidate.id}>
-                      {candidate.fullName}
-                    </option>
-                  ))}
-                </select>
-                <button
-                  className="rounded-xl bg-slate-900 px-3 py-2 text-xs font-semibold text-white disabled:opacity-40"
-                  onClick={addPartner}
-                  disabled={!selectedPartnerId}
-                  type="button"
-                >
-                  Link
-                </button>
+                  placeholder="Marriage date (optional)"
+                  value={selectedPartnerMarriageDate}
+                  aria-label="Marriage date (optional)"
+                  title="Marriage date (optional)"
+                  onChange={(event) => setSelectedPartnerMarriageDate(event.target.value)}
+                />
               </div>
             )}
           </div>

@@ -51,6 +51,7 @@ create table if not exists public.relationships (
   parent_id uuid not null references public.persons on delete cascade,
   child_id uuid not null references public.persons on delete cascade,
   relationship_type text not null default 'parent' check (relationship_type in ('parent', 'partner')),
+  marriage_date date,
   created_at timestamptz not null default now()
 );
 

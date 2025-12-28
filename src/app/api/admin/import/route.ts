@@ -126,12 +126,14 @@ export async function POST(request: Request) {
       if (!isUuid(parentId) || !isUuid(childId)) return null;
       const rawId = String(rel.id ?? "");
       const id = rawId && isUuid(rawId) ? rawId : crypto.randomUUID();
+      const marriageDate = normalizeDateInput(rel.marriageDate ?? rel.marriage_date);
       return {
         id,
         clan_id: clanId,
         parent_id: parentId,
         child_id: childId,
         relationship_type: rel.relationshipType ?? rel.relationship_type ?? "parent",
+        marriage_date: marriageDate,
       };
     })
     .filter(Boolean) as Array<Record<string, unknown>>;

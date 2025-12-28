@@ -65,6 +65,7 @@ const mapRelationshipRow = (row: any): Relationship => ({
   parentId: row.parent_id,
   childId: row.child_id,
   relationshipType: row.relationship_type ?? "parent",
+  marriageDate: row.marriage_date ?? undefined,
 });
 
 const mapPositionRow = (row: any): PersonPosition => ({
@@ -170,6 +171,12 @@ const toPersonUpdateRow = (payload: Record<string, unknown>) => {
   if ("notes" in payload) row.notes = payload.notes;
   if ("stats" in payload) row.stats = payload.stats;
   if ("photoUrl" in payload) row.photo_url = payload.photoUrl;
+  return row;
+};
+
+const toRelationshipUpdateRow = (payload: Record<string, unknown>) => {
+  const row: Record<string, unknown> = {};
+  if ("marriageDate" in payload) row.marriage_date = payload.marriageDate || null;
   return row;
 };
 
@@ -540,7 +547,8 @@ export const useAppData = () => {
   const createRelationship = async (
     personAId: string,
     personBId: string,
-    relationshipType: "parent" | "partner"
+    relationshipType: "parent" | "partner",
+    options?: { marriageDate?: string | null }
   ) => {
     if (!personAId || !personBId || personAId === personBId) {
       return undefined;
@@ -562,18 +570,26 @@ export const useAppData = () => {
       return existing;
     }
 
+    const normalizedMarriageDate = isPartner
+      ? normalizeDateInput(options?.marriageDate)
+      : null;
+
     const relationship: Relationship = {
       id: crypto.randomUUID(),
       clanId: activeClanId,
       parentId: personAId,
       childId: personBId,
       relationshipType,
+      ...(normalizedMarriageDate ? { marriageDate: normalizedMarriageDate } : {}),
     };
 
     const changeDiff = isPartner
       ? [
           { field: "partnerA", before: "-", after: personAId },
           { field: "partnerB", before: "-", after: personBId },
+          ...(normalizedMarriageDate
+            ? [{ field: "marriageDate", before: "-", after: normalizedMarriageDate }]
+            : []),
         ]
       : [
           { field: "parent", before: "-", after: personAId },
@@ -608,6 +624,7 @@ export const useAppData = () => {
         parent_id: personAId,
         child_id: personBId,
         relationship_type: relationshipType,
+        marriage_date: normalizedMarriageDate,
       })
       .select()
       .single();
@@ -646,8 +663,100 @@ export const useAppData = () => {
   const createParentChildRelationship = async (parentId: string, childId: string) =>
     createRelationship(parentId, childId, "parent");
 
-  const createPartnerRelationship = async (personId: string, partnerId: string) =>
-    createRelationship(personId, partnerId, "partner");
+  const createPartnerRelationship = async (
+    personId: string,
+    partnerId: string,
+    marriageDate?: string | null
+  ) => createRelationship(personId, partnerId, "partner", { marriageDate });
+
+  const updateRelationship = async (
+    relationshipId: string,
+    payload: Record<string, unknown>
+  ) => {
+    const target = relationships.find((rel) => rel.id === relationshipId);
+    if (!target) return;
+    if (target.relationshipType !== "partner") return;
+    if (!("marriageDate" in payload)) return;
+
+    const normalizedMarriageDate = "marriageDate" in payload
+      ? normalizeDateInput(payload.marriageDate) ?? null
+      : null;
+    const updated: Relationship = {
+      ...target,
+      ...("marriageDate" in payload
+        ? { marriageDate: normalizedMarriageDate ?? undefined }
+        : {}),
+    };
+
+    const diff = [];
+    if ("marriageDate" in payload) {
+      diff.push({
+        field: "marriageDate",
+        before: target.marriageDate ?? "-",
+        after: normalizedMarriageDate ?? "-",
+      });
+    }
+
+    if (!isSupabaseEnabled || !supabase) {
+      setRelationships((prev) =>
+        prev.map((rel) => (rel.id === relationshipId ? updated : rel))
+      );
+      setChangeEvents((prev) => [
+        {
+          id: crypto.randomUUID(),
+          clanId: activeClanId,
+          actorId: currentUser.id,
+          actorName: actorLabel,
+          targetType: "relationship",
+          targetId: relationshipId,
+          action: "update",
+          diff,
+          createdAt: new Date().toISOString(),
+        },
+        ...prev,
+      ]);
+      return;
+    }
+
+    const { data: updatedRow } = await supabase
+      .from("relationships")
+      .update(toRelationshipUpdateRow({ marriageDate: normalizedMarriageDate }))
+      .eq("id", relationshipId)
+      .select()
+      .single();
+
+    if (updatedRow) {
+      const nextRelationship = mapRelationshipRow(updatedRow);
+      setRelationships((prev) =>
+        prev.map((rel) => (rel.id === nextRelationship.id ? nextRelationship : rel))
+      );
+    }
+
+    await supabase.from("change_events").insert({
+      clan_id: activeClanId,
+      actor_id: currentUser.id,
+      actor_name: actorLabel,
+      target_type: "relationship",
+      target_id: relationshipId,
+      action: "update",
+      diff,
+    });
+
+    setChangeEvents((prev) => [
+      {
+        id: crypto.randomUUID(),
+        clanId: activeClanId,
+        actorId: currentUser.id,
+        actorName: actorLabel,
+        targetType: "relationship",
+        targetId: relationshipId,
+        action: "update",
+        diff,
+        createdAt: new Date().toISOString(),
+      },
+      ...prev,
+    ]);
+  };
 
   const deleteRelationship = async (relationshipId: string) => {
     const target = relationships.find((rel) => rel.id === relationshipId);
@@ -935,12 +1044,16 @@ export const useAppData = () => {
         if (!isUuid(parentId) || !isUuid(childId)) return null;
         const rawId = String(rel.id ?? "");
         const id = rawId && isUuid(rawId) ? rawId : crypto.randomUUID();
+        const marriageDate = normalizeDateInput(
+          (rel as any).marriageDate ?? (rel as any).marriage_date
+        );
         return {
           id,
           clanId,
           parentId,
           childId,
           relationshipType: rel.relationshipType ?? (rel as any).relationship_type ?? "parent",
+          ...(marriageDate ? { marriageDate } : {}),
         };
       })
       .filter(Boolean) as Relationship[];
@@ -1004,6 +1117,7 @@ export const useAppData = () => {
           parent_id: rel.parentId,
           child_id: rel.childId,
           relationship_type: rel.relationshipType ?? "parent",
+          marriage_date: rel.marriageDate ?? null,
         })),
         { onConflict: "id" }
       )
@@ -1206,6 +1320,7 @@ export const useAppData = () => {
     createPerson,
     createParentChildRelationship,
     createPartnerRelationship,
+    updateRelationship,
     deleteRelationship,
     uploadPersonPhoto,
     importPeople,
