@@ -5,6 +5,8 @@ import type { Person, Relationship, PersonPosition } from "./types";
 const NODE_WIDTH = 280;
 const NODE_HEIGHT = 170;
 const FAMILY_NODE_SIZE = 12;
+const PARTNER_EDGE_WEIGHT = 8;
+const PARTNER_EDGE_MINLEN = 1;
 const PARENT_EDGE_MINLEN = 1;
 const CHILD_EDGE_MINLEN = 1;
 
@@ -111,10 +113,10 @@ export const buildTreeGraph = ({
   graph.setDefaultEdgeLabel(() => ({}));
   graph.setGraph({
     rankdir: direction,
-    nodesep: direction === "TB" ? 120 : 90,
-    ranksep: direction === "TB" ? 220 : 170,
+    nodesep: direction === "TB" ? 140 : 110,
+    ranksep: direction === "TB" ? 240 : 190,
     edgesep: 30,
-    ranker: "tight-tree",
+    ranker: "network-simplex",
   });
 
   persons.forEach((person) => {
@@ -146,8 +148,8 @@ export const buildTreeGraph = ({
     string,
     { id: string; parentA: string; parentB: string; children: Set<string> }
   >();
-  const partnerGroups = new Map<string, { id: string; parentA: string; parentB: string }>();
   const familyParentChildPairs = new Set<string>();
+  const familyPairKeys = new Set<string>();
 
   parentsByChild.forEach((parentIds, childId) => {
     if (parentIds.length < 2) return;
@@ -163,6 +165,7 @@ export const buildTreeGraph = ({
     }
     if (!pair) return;
     const pairKey = normalizePair(pair[0], pair[1]);
+    familyPairKeys.add(pairKey);
     const existing = familyGroups.get(pairKey);
     if (existing) {
       existing.children.add(childId);
@@ -182,25 +185,21 @@ export const buildTreeGraph = ({
     graph.setNode(group.id, { width: FAMILY_NODE_SIZE, height: FAMILY_NODE_SIZE });
     graph.setEdge(group.parentA, group.id, { weight: 1.2, minlen: 1 });
     graph.setEdge(group.parentB, group.id, { weight: 1.2, minlen: 1 });
+    graph.setEdge(group.parentA, group.parentB, {
+      weight: PARTNER_EDGE_WEIGHT,
+      minlen: PARTNER_EDGE_MINLEN,
+    });
     group.children.forEach((childId) => {
       graph.setEdge(group.id, childId, { weight: 2, minlen: CHILD_EDGE_MINLEN });
     });
   });
 
   partnerLinks.forEach((rel) => {
-    const pairKey = normalizePair(rel.parentId, rel.childId);
-    if (familyGroups.has(pairKey) || partnerGroups.has(pairKey)) return;
-    partnerGroups.set(pairKey, {
-      id: `partner:${pairKey}`,
-      parentA: rel.parentId,
-      parentB: rel.childId,
+    if (familyPairKeys.has(normalizePair(rel.parentId, rel.childId))) return;
+    graph.setEdge(rel.parentId, rel.childId, {
+      weight: PARTNER_EDGE_WEIGHT,
+      minlen: PARTNER_EDGE_MINLEN,
     });
-  });
-
-  partnerGroups.forEach((group) => {
-    graph.setNode(group.id, { width: FAMILY_NODE_SIZE, height: FAMILY_NODE_SIZE });
-    graph.setEdge(group.parentA, group.id, { weight: 1.8, minlen: 1 });
-    graph.setEdge(group.parentB, group.id, { weight: 1.8, minlen: 1 });
   });
 
   parentLinks.forEach((rel) => {
@@ -210,6 +209,52 @@ export const buildTreeGraph = ({
       minlen: PARENT_EDGE_MINLEN,
     });
   });
+
+  const connectivity = new Map<string, string[]>();
+  const connect = (fromId: string, toId: string) => {
+    if (!connectivity.has(fromId)) connectivity.set(fromId, []);
+    connectivity.get(fromId)?.push(toId);
+  };
+
+  parentLinks.forEach((rel) => {
+    connect(rel.parentId, rel.childId);
+    connect(rel.childId, rel.parentId);
+  });
+  partnerLinks.forEach((rel) => {
+    connect(rel.parentId, rel.childId);
+    connect(rel.childId, rel.parentId);
+  });
+
+  const childIds = new Set(parentLinks.map((rel) => rel.childId));
+  const visited = new Set<string>();
+  const componentRoots: string[] = [];
+
+  persons.forEach((person) => {
+    if (visited.has(person.id)) return;
+    const queue = [person.id];
+    let rootCandidate = "";
+    while (queue.length > 0) {
+      const current = queue.shift();
+      if (!current || visited.has(current)) continue;
+      visited.add(current);
+      if (!childIds.has(current) && !rootCandidate) {
+        rootCandidate = current;
+      }
+      const neighbors = connectivity.get(current) ?? [];
+      neighbors.forEach((neighbor) => {
+        if (!visited.has(neighbor)) queue.push(neighbor);
+      });
+    }
+    componentRoots.push(rootCandidate || person.id);
+  });
+
+  if (componentRoots.length > 1) {
+    const virtualRootId = "virtual:root";
+    graph.setNode(virtualRootId, { width: 1, height: 1 });
+    componentRoots.forEach((rootId) => {
+      graph.setEdge(virtualRootId, rootId, { weight: 0.1, minlen: 1 });
+    });
+  }
 
   dagre.layout(graph);
 
