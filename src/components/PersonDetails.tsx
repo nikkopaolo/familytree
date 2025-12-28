@@ -51,6 +51,7 @@ export const PersonDetails = ({
   const relationshipSummary = useMemo(() => {
     const sortByName = (a: Person, b: Person) =>
       a.fullName.localeCompare(b.fullName, undefined, { sensitivity: "base" });
+    const isPerson = (value: Person | undefined): value is Person => Boolean(value);
     if (!personId) {
       return {
         parents: [] as Person[],
@@ -79,18 +80,18 @@ export const PersonDetails = ({
 
     const parents = parentLinks
       .map((rel) => persons.find((p) => p.id === rel.parentId))
-      .filter(Boolean)
-      .sort(sortByName) as Person[];
+      .filter(isPerson)
+      .sort(sortByName);
     const children = childLinks
       .map((rel) => persons.find((p) => p.id === rel.childId))
-      .filter(Boolean)
-      .sort(sortByName) as Person[];
+      .filter(isPerson)
+      .sort(sortByName);
     const partners = partnerLinks
       .map((rel) =>
         persons.find((p) => p.id === (rel.parentId === personId ? rel.childId : rel.parentId))
       )
-      .filter(Boolean)
-      .sort(sortByName) as Person[];
+      .filter(isPerson)
+      .sort(sortByName);
 
     const parentIdSet = new Set(parentLinks.map((rel) => rel.parentId));
     const childIdSet = new Set(childLinks.map((rel) => rel.childId));
@@ -119,8 +120,8 @@ export const PersonDetails = ({
 
     const siblings = Array.from(siblingIds)
       .map((id) => persons.find((p) => p.id === id))
-      .filter(Boolean)
-      .sort(sortByName) as Person[];
+      .filter(isPerson)
+      .sort(sortByName);
 
     const grandparentIds = new Set(
       relationships
@@ -142,8 +143,8 @@ export const PersonDetails = ({
 
     const auntsUncles = Array.from(auntUncleIds)
       .map((id) => persons.find((p) => p.id === id))
-      .filter(Boolean)
-      .sort(sortByName) as Person[];
+      .filter(isPerson)
+      .sort(sortByName);
 
     const nieceNephewIds = new Set(
       relationships
@@ -155,8 +156,8 @@ export const PersonDetails = ({
 
     const niecesNephews = Array.from(nieceNephewIds)
       .map((id) => persons.find((p) => p.id === id))
-      .filter(Boolean)
-      .sort(sortByName) as Person[];
+      .filter(isPerson)
+      .sort(sortByName);
 
     return {
       parents,
