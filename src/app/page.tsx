@@ -164,17 +164,21 @@ export default function Home() {
         }}
       />
       <TabNav activeTab={activeTab} onChange={setActiveTab} showSuggestions={false} />
-      <div className="mx-auto mt-6 grid w-[min(1200px,94vw)] grid-cols-1 gap-6 xl:grid-cols-[minmax(0,1fr)_320px]">
+      <div className="mx-auto mt-6 grid w-[min(1320px,94vw)] grid-cols-1 gap-6 xl:grid-cols-[minmax(0,1fr)_300px]">
         <section className="flex flex-col gap-6">
-          <div className="grid gap-4 md:grid-cols-3">
-            {quickStats.map((stat) => (
-              <div key={stat.label} className="glass-card rounded-3xl p-5">
-                <p className="text-xs font-semibold uppercase tracking-[0.2em] text-slate-500">
-                  {stat.label}
-                </p>
-                <p className="mt-3 text-3xl text-slate-900">{stat.value}</p>
-              </div>
-            ))}
+          <div className="glass-card rounded-3xl px-6 py-4">
+            <div className="grid divide-y divide-slate-200 sm:grid-cols-3 sm:divide-y-0 sm:divide-x">
+              {quickStats.map((stat) => (
+                <div key={stat.label} className="py-3 sm:px-6 sm:py-2">
+                  <p className="text-xs font-semibold uppercase tracking-[0.2em] text-slate-500">
+                    {stat.label}
+                  </p>
+                  <p className="mt-2 text-3xl font-semibold text-slate-900">
+                    {stat.value}
+                  </p>
+                </div>
+              ))}
+            </div>
           </div>
           {activeTab === "tree" && (
             <TreeCanvas
@@ -246,6 +250,7 @@ export default function Home() {
           {activeTab === "history" && <HistoryPanel events={clanEvents} persons={clanPersons} />}
         </section>
         <div className="flex flex-col gap-6">
+          <UpcomingBirthdays persons={clanPersons} relationships={clanRelationships} />
           <AuthPanel
             isSupabaseEnabled={isSupabaseEnabled}
             isGuest={isGuest}
@@ -255,7 +260,6 @@ export default function Home() {
             onSignOut={signOut}
             adminBootstrapError={adminBootstrapError}
           />
-          <UpcomingBirthdays persons={clanPersons} />
           <PersonDetails
             person={selectedPerson}
             persons={clanPersons}

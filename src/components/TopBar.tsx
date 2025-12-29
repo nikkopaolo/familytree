@@ -26,10 +26,10 @@ export const TopBar = ({
   const activeClanName = clans[0]?.name ?? "Katigbak";
   const canManage = role === "admin";
   return (
-    <header className="glass-card sticky top-4 z-20 mx-auto mt-4 flex w-[min(1200px,94vw)] flex-col gap-4 rounded-3xl px-6 py-5 md:flex-row md:items-center md:justify-between">
+    <header className="glass-card sticky top-4 z-20 mx-auto mt-4 flex w-[min(1320px,94vw)] flex-col gap-3 rounded-3xl px-6 py-4 md:flex-row md:items-center md:justify-between">
       <div className="flex flex-col gap-2">
         <div className="flex items-center gap-3">
-          <div className="rounded-2xl bg-amber-100 px-3 py-2 text-xs font-semibold uppercase tracking-[0.2em] text-amber-900">
+          <div className="rounded-2xl bg-amber-100 px-3 py-1.5 text-xs font-semibold uppercase tracking-[0.2em] text-amber-900">
             FamTree Cloud
           </div>
           <span className="inline-flex items-center gap-2 rounded-full bg-emerald-50 px-3 py-1 text-xs font-semibold text-emerald-700">
@@ -38,15 +38,15 @@ export const TopBar = ({
           </span>
         </div>
         <div>
-          <h1 className="text-3xl text-slate-900">Katigbak Family Tree</h1>
+          <h1 className="text-2xl text-slate-900 md:text-3xl">Katigbak Family Tree</h1>
           <p className="text-sm text-slate-600">
             Living history and connections for the {activeClanName} family.
           </p>
         </div>
       </div>
-      <div className="flex flex-wrap items-center gap-3">
-        <div className="flex items-center gap-2 rounded-2xl bg-white px-4 py-2 text-sm text-slate-700 shadow-sm">
-          <div className="flex size-9 items-center justify-center rounded-xl bg-slate-100 text-sm font-semibold text-slate-600">
+      <div className="flex flex-wrap items-center gap-3 md:justify-end">
+        <div className="flex items-center gap-2 rounded-2xl bg-white px-3 py-2 text-xs text-slate-700 shadow-sm">
+          <div className="flex size-8 items-center justify-center rounded-xl bg-slate-100 text-xs font-semibold text-slate-600">
             {user.name.slice(0, 2).toUpperCase()}
           </div>
           <div>
@@ -55,9 +55,9 @@ export const TopBar = ({
           </div>
         </div>
         {canManage && (
-          <>
+          <div className="flex items-center gap-2">
             <button
-              className="inline-flex items-center gap-2 rounded-2xl border border-slate-200 bg-white px-4 py-2 text-sm font-semibold text-slate-700 shadow-sm transition hover:border-amber-300 hover:text-amber-700"
+              className="inline-flex items-center gap-2 rounded-2xl border border-slate-200 bg-white px-3 py-2 text-xs font-semibold text-slate-700 shadow-sm transition hover:border-amber-300 hover:text-amber-700"
               onClick={onInviteAdmin}
               type="button"
             >
@@ -65,14 +65,14 @@ export const TopBar = ({
               Invite Admin
             </button>
             <button
-              className="inline-flex items-center gap-2 rounded-2xl bg-amber-500 px-4 py-2 text-sm font-semibold text-white shadow-lg shadow-amber-200 transition hover:bg-amber-600"
+              className="inline-flex items-center gap-2 rounded-2xl bg-amber-500 px-3 py-2 text-xs font-semibold text-white shadow-lg shadow-amber-200 transition hover:bg-amber-600"
               onClick={onAddMember}
               type="button"
             >
               <Wand2 size={16} />
               Add Member
             </button>
-          </>
+          </div>
         )}
       </div>
     </header>
