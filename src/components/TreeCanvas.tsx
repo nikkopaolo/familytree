@@ -4,7 +4,6 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import ReactFlow, {
   Background,
   Controls,
-  MiniMap,
   Node,
   type ReactFlowInstance,
   useNodesState,
@@ -696,11 +695,6 @@ export const TreeCanvas = ({
             }
           }}
         >
-          <MiniMap
-            pannable
-            nodeColor={() => "#f1b34c"}
-            maskColor="rgba(255, 255, 255, 0.7)"
-          />
           <Controls position="bottom-right" />
           <Background gap={20} color="rgba(31, 41, 51, 0.12)" />
         </ReactFlow>
