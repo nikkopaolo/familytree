@@ -71,7 +71,7 @@ export const ImportExportPanel = ({
         setMessage(result.error);
         return;
       }
-      setMessage("CSV imported. New members added as standalone branches.");
+      setMessage("CSV imported. Relationships linked when data is available.");
       return;
     }
     if (file.name.endsWith(".ged") || file.name.endsWith(".gedcom")) {

@@ -929,11 +929,11 @@ export const useAppData = () => {
     return { error: "" };
   };
 
-  const importPeople = async (rows: Array<Record<string, string>>) => {
-    if (isSupabaseEnabled && !isAdmin) {
-      return { error: "Sign in as a clan admin to import." };
-    }
-    let clanId = activeClanId;
+    const importPeople = async (rows: Array<Record<string, string>>) => {
+      if (isSupabaseEnabled && !isAdmin) {
+        return { error: "Sign in as a clan admin to import." };
+      }
+      let clanId = activeClanId;
     const validClan = clans.find((clan) => clan.id === clanId);
     if (!validClan || !isUuid(clanId)) {
       if (isSupabaseEnabled && supabase) {
@@ -944,42 +944,231 @@ export const useAppData = () => {
         }
       }
     }
-    if (isSupabaseEnabled && (!clanId || !isUuid(clanId))) {
-      return { error: "No valid clan selected for import." };
-    }
-    const imported = rows.map((row) => {
-      const id = crypto.randomUUID();
-      const birthDate = normalizeDateInput(row.birth_date || row.birthDate) ?? undefined;
-      const deathDate = normalizeDateInput(row.death_date || row.deathDate) ?? undefined;
-      const isAlive = row.is_alive
-        ? row.is_alive.toLowerCase() !== "false"
-        : !deathDate;
-      return {
-        id,
-        clanId,
-        fullName: row.full_name || row.fullName || "New Member",
-        birthDate,
-        deathDate,
-        isAlive,
-        gender: row.gender || undefined,
-        branchRootId: id,
-        photoUrl: row.photo_url || row.photoUrl || undefined,
-        notes: row.notes || undefined,
-        stats: {
-          location: row.location || undefined,
-        },
-        createdAt: new Date().toISOString(),
-      } as Person;
-    });
+      if (isSupabaseEnabled && (!clanId || !isUuid(clanId))) {
+        return { error: "No valid clan selected for import." };
+      }
+      const normalizeNameKey = (value: string) => value.trim().toLowerCase();
+      const splitListValue = (value?: string) => {
+        if (!value) return [];
+        return value
+          .split(/\s*\|\s*|\s*;\s*|\r?\n/)
+          .map((item) => item.trim())
+          .filter(Boolean);
+      };
+      const getRowValue = (row: Record<string, string>, keys: string[]) => {
+        for (const key of keys) {
+          const value = row[key];
+          if (value && value.trim()) return value;
+        }
+        return "";
+      };
+      const buildUniqueNameMap = (people: Person[]) => {
+        const map = new Map<string, string[]>();
+        people.forEach((person) => {
+          const key = normalizeNameKey(person.fullName || "");
+          if (!key) return;
+          const list = map.get(key) ?? [];
+          list.push(person.id);
+          map.set(key, list);
+        });
+        const resolved = new Map<string, string>();
+        map.forEach((ids, key) => {
+          if (ids.length === 1) {
+            resolved.set(key, ids[0]);
+          }
+        });
+        return resolved;
+      };
+      const parsePartnerEntry = (value: string) => {
+        const trimmed = value.trim();
+        if (!trimmed) return null;
+        const match = trimmed.match(/^(.*)\(([^)]+)\)\s*$/);
+        if (match) {
+          const name = match[1].trim();
+          const dateValue = normalizeDateInput(match[2].trim()) ?? undefined;
+          return { name, dateValue };
+        }
+        return { name: trimmed, dateValue: undefined };
+      };
 
-    if (!isSupabaseEnabled || !supabase) {
-      setPersons((prev) => [...imported, ...prev]);
-      return { error: "" };
-    }
+      const usedIds = new Set<string>();
+      const resolveRowId = (rawValue?: string) => {
+        const trimmed = rawValue?.trim() ?? "";
+        if (trimmed && isUuid(trimmed) && !usedIds.has(trimmed)) {
+          usedIds.add(trimmed);
+          return trimmed;
+        }
+        let nextId = crypto.randomUUID();
+        while (usedIds.has(nextId)) {
+          nextId = crypto.randomUUID();
+        }
+        usedIds.add(nextId);
+        return nextId;
+      };
 
-    const { data: inserted } = await supabase
-      .from("persons")
-      .upsert(
+      const imported = rows.map((row) => {
+        const rawId = row.id || row.person_id || row.personId || "";
+        const id = resolveRowId(rawId);
+        const birthDate = normalizeDateInput(row.birth_date || row.birthDate) ?? undefined;
+        const deathDate = normalizeDateInput(row.death_date || row.deathDate) ?? undefined;
+        const isAlive = row.is_alive
+          ? row.is_alive.toLowerCase() !== "false"
+          : !deathDate;
+        return {
+          id,
+          clanId,
+          fullName: row.full_name || row.fullName || "New Member",
+          birthDate,
+          deathDate,
+          isAlive,
+          gender: row.gender || undefined,
+          branchRootId: id,
+          photoUrl: row.photo_url || row.photoUrl || undefined,
+          notes: row.notes || undefined,
+          stats: {
+            location: row.location || undefined,
+            occupation: row.occupation || undefined,
+          },
+          createdAt: new Date().toISOString(),
+        } as Person;
+      });
+
+      const existingClanPersons = persons.filter((person) => person.clanId === clanId);
+      const importedNameMap = buildUniqueNameMap(imported);
+      const existingNameMap = buildUniqueNameMap(existingClanPersons);
+      const idLookup = new Set([
+        ...imported.map((person) => person.id),
+        ...existingClanPersons.map((person) => person.id),
+      ]);
+
+      const resolvePersonId = (value: string) => {
+        const trimmed = value.trim();
+        if (!trimmed) return null;
+        if (isUuid(trimmed)) {
+          return idLookup.has(trimmed) ? trimmed : null;
+        }
+        const key = normalizeNameKey(trimmed);
+        return importedNameMap.get(key) ?? existingNameMap.get(key) ?? null;
+      };
+
+      const existingParentKeys = new Set(
+        relationships
+          .filter(
+            (rel) =>
+              rel.relationshipType === "parent" && rel.clanId === clanId
+          )
+          .map((rel) => `${rel.parentId}|${rel.childId}`)
+      );
+      const normalizePair = (left: string, right: string) =>
+        left < right ? `${left}|${right}` : `${right}|${left}`;
+      const existingPartnerKeys = new Set(
+        relationships
+          .filter(
+            (rel) =>
+              rel.relationshipType === "partner" && rel.clanId === clanId
+          )
+          .map((rel) => normalizePair(rel.parentId, rel.childId))
+      );
+      const partnerIndexByKey = new Map<string, number>();
+      const importedRelationships: Relationship[] = [];
+
+      const addParentRelationship = (parentId: string, childId: string) => {
+        if (!parentId || !childId || parentId === childId) return;
+        const key = `${parentId}|${childId}`;
+        if (existingParentKeys.has(key)) return;
+        existingParentKeys.add(key);
+        importedRelationships.push({
+          id: crypto.randomUUID(),
+          clanId,
+          parentId,
+          childId,
+          relationshipType: "parent",
+        });
+      };
+
+      const addPartnerRelationship = (
+        firstId: string,
+        secondId: string,
+        marriageDate?: string
+      ) => {
+        if (!firstId || !secondId || firstId === secondId) return;
+        const key = normalizePair(firstId, secondId);
+        const existingIndex = partnerIndexByKey.get(key);
+        if (existingIndex !== undefined) {
+          if (marriageDate && !importedRelationships[existingIndex].marriageDate) {
+            importedRelationships[existingIndex].marriageDate = marriageDate;
+          }
+          return;
+        }
+        if (existingPartnerKeys.has(key)) return;
+        const relationship: Relationship = {
+          id: crypto.randomUUID(),
+          clanId,
+          parentId: firstId,
+          childId: secondId,
+          relationshipType: "partner",
+          ...(marriageDate ? { marriageDate } : {}),
+        };
+        existingPartnerKeys.add(key);
+        partnerIndexByKey.set(key, importedRelationships.length);
+        importedRelationships.push(relationship);
+      };
+
+      rows.forEach((row, index) => {
+        const person = imported[index];
+        if (!person) return;
+        const parentTokens = splitListValue(
+          getRowValue(row, ["parents", "parent", "parent_names", "parent_name"])
+        );
+        const childTokens = splitListValue(
+          getRowValue(row, ["children", "child", "child_names", "child_name"])
+        );
+        const partnerTokens = splitListValue(
+          getRowValue(row, ["partners", "partner", "partner_names", "partner_name"])
+        );
+        const marriageTokens = splitListValue(
+          getRowValue(row, [
+            "partner_marriages",
+            "partner_marriage",
+            "partner_marriage_dates",
+            "partner_marriages_dates",
+            "partnerMarriage",
+          ])
+        );
+
+        parentTokens.forEach((entry) => {
+          const parentId = resolvePersonId(entry);
+          if (parentId) addParentRelationship(parentId, person.id);
+        });
+
+        childTokens.forEach((entry) => {
+          const childId = resolvePersonId(entry);
+          if (childId) addParentRelationship(person.id, childId);
+        });
+
+        const partnerEntries = [
+          ...partnerTokens.map((value) => ({ name: value, dateValue: undefined })),
+          ...marriageTokens.map((value) => parsePartnerEntry(value)).filter(Boolean),
+        ] as Array<{ name: string; dateValue?: string }>;
+
+        partnerEntries.forEach((entry) => {
+          const partnerId = resolvePersonId(entry.name);
+          if (!partnerId) return;
+          addPartnerRelationship(person.id, partnerId, entry.dateValue);
+        });
+      });
+
+      if (!isSupabaseEnabled || !supabase) {
+        setPersons((prev) => [...imported, ...prev]);
+        if (importedRelationships.length > 0) {
+          setRelationships((prev) => [...importedRelationships, ...prev]);
+        }
+        return { error: "" };
+      }
+
+      const { data: inserted } = await supabase
+        .from("persons")
+        .upsert(
         imported.map((person) => ({
           id: person.id,
           clan_id: clanId,
@@ -993,17 +1182,42 @@ export const useAppData = () => {
           stats: person.stats ?? {},
         })),
         { onConflict: "id" }
-      )
-      .select();
+        )
+        .select();
 
-    if (inserted) {
-      setPersons((prev) => [
-        ...inserted.map(mapPersonRow),
-        ...prev.filter((person) => person.clanId !== activeClanId),
-      ]);
-    }
-    return { error: "" };
-  };
+      if (inserted) {
+        setPersons((prev) => [
+          ...inserted.map(mapPersonRow),
+          ...prev.filter((person) => person.clanId !== activeClanId),
+        ]);
+      }
+      if (importedRelationships.length > 0) {
+        const { data: relationshipRows, error: relationshipError } = await supabase
+          .from("relationships")
+          .upsert(
+            importedRelationships.map((rel) => ({
+              id: rel.id,
+              clan_id: clanId,
+              parent_id: rel.parentId,
+              child_id: rel.childId,
+              relationship_type: rel.relationshipType,
+              marriage_date: rel.marriageDate ?? null,
+            })),
+            { onConflict: "id" }
+          )
+          .select();
+        if (relationshipError) {
+          return { error: relationshipError.message };
+        }
+        if (relationshipRows) {
+          setRelationships((prev) => [
+            ...relationshipRows.map(mapRelationshipRow),
+            ...prev.filter((rel) => rel.clanId !== activeClanId),
+          ]);
+        }
+      }
+      return { error: "" };
+    };
 
   const importTreeJson = async (payload: { persons: Person[]; relationships: Relationship[] }) => {
     if (isSupabaseEnabled && !isAdmin) {
