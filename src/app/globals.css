@@ -4,26 +4,34 @@
 
 :root {
   color-scheme: light;
-  --ink: #0f172a;
-  --slate: #475569;
-  --mist: #eef2f6;
-  --paper: #f8fafc;
-  --river: #2563eb;
-  --leaf: #0f766e;
-  --sun: #f59e0b;
-  --ember: #e11d48;
-  --glow: rgba(37, 99, 235, 0.16);
-  --card: rgba(255, 255, 255, 0.92);
-  --stroke: rgba(15, 23, 42, 0.08);
+  --ink: #1f2933;
+  --slate: #334155;
+  --mist: #f3f0ea;
+  --paper: #fbf7f0;
+  --river: #1f6f8b;
+  --leaf: #2f6f4e;
+  --sun: #f1b34c;
+  --ember: #e76f51;
+  --glow: rgba(241, 179, 76, 0.35);
+  --card: rgba(255, 255, 255, 0.75);
+  --stroke: rgba(31, 41, 51, 0.12);
+  --accent: #f1b34c;
+  --tree-edge: rgba(31, 41, 51, 0.6);
+  --tree-partner: rgba(241, 179, 76, 0.85);
+  --tree-sibling: rgba(47, 111, 78, 0.5);
+  --tree-label: rgba(31, 41, 51, 0.75);
+  --tree-label-bg: rgba(255, 250, 241, 0.9);
+  --tree-sibling-label: rgba(47, 111, 78, 0.75);
+  --tree-sibling-label-bg: rgba(240, 253, 244, 0.9);
 }
 
 body {
   font-family: var(--font-body), system-ui, sans-serif;
   color: var(--ink);
   background:
-    radial-gradient(1200px 700px at 10% -10%, rgba(37, 99, 235, 0.12), transparent 60%),
-    radial-gradient(900px 600px at 90% 8%, rgba(15, 118, 110, 0.12), transparent 55%),
-    linear-gradient(180deg, #f8fafc 0%, #f2f5f9 50%, #eef2f6 100%);
+    radial-gradient(1200px 600px at 15% -5%, rgba(241, 179, 76, 0.35), transparent 60%),
+    radial-gradient(900px 500px at 85% 10%, rgba(31, 111, 139, 0.25), transparent 55%),
+    linear-gradient(180deg, #f7f1e6 0%, #fbf7f0 35%, #f6efe4 100%);
   min-height: 100vh;
 }
 
@@ -38,14 +46,14 @@ h4 {
 .glass-card {
   background: var(--card);
   border: 1px solid var(--stroke);
-  box-shadow: 0 18px 40px rgba(15, 23, 42, 0.1);
+  box-shadow: 0 24px 60px rgba(31, 41, 51, 0.12);
   backdrop-filter: blur(18px);
 }
 
 .surface-card {
-  background: #ffffff;
-  border: 1px solid rgba(15, 23, 42, 0.08);
-  box-shadow: 0 12px 26px rgba(15, 23, 42, 0.08);
+  background: #fffaf1;
+  border: 1px solid rgba(31, 41, 51, 0.08);
+  box-shadow: 0 16px 32px rgba(31, 41, 51, 0.08);
 }
 
 .chip {
@@ -57,20 +65,20 @@ h4 {
   background-image:
     repeating-linear-gradient(
       to bottom,
-      rgba(148, 163, 184, 0.08) 0,
-      rgba(148, 163, 184, 0.08) 140px,
-      transparent 140px,
-      transparent 280px
+      rgba(241, 179, 76, 0.08) 0,
+      rgba(241, 179, 76, 0.08) 120px,
+      transparent 120px,
+      transparent 240px
     ),
-    radial-gradient(rgba(148, 163, 184, 0.2) 1px, transparent 1px);
-  background-size: auto, 24px 24px;
+    radial-gradient(rgba(31, 41, 51, 0.08) 1px, transparent 1px);
+  background-size: auto, 22px 22px;
 }
 
 .react-flow__node-person {
   border-radius: 16px;
-  border: 1px solid rgba(15, 23, 42, 0.12);
-  box-shadow: 0 10px 22px rgba(15, 23, 42, 0.12);
-  background: #ffffff;
+  border: 1px solid rgba(31, 41, 51, 0.2);
+  box-shadow: 0 10px 24px rgba(31, 41, 51, 0.12);
+  background: #fffaf1;
 }
 
 .family-node {
@@ -78,122 +86,127 @@ h4 {
   width: 12px;
   height: 12px;
   border-radius: 999px;
-  background: rgba(245, 158, 11, 0.9);
-  border: 2px solid rgba(124, 45, 18, 0.18);
-  box-shadow: 0 2px 8px rgba(15, 23, 42, 0.12);
+  background: var(--tree-partner);
+  border: 2px solid rgba(124, 45, 18, 0.25);
+  box-shadow: 0 2px 8px rgba(31, 41, 51, 0.15);
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    color-scheme: dark;
-    --ink: #e2e8f0;
-    --slate: #94a3b8;
-    --mist: #0b1220;
-    --paper: #0f172a;
-    --river: #60a5fa;
-    --leaf: #34d399;
-    --sun: #fbbf24;
-    --ember: #fb7185;
-    --glow: rgba(96, 165, 250, 0.2);
-    --card: rgba(15, 23, 42, 0.82);
-    --stroke: rgba(148, 163, 184, 0.18);
-  }
+html[data-theme="dark"] {
+  color-scheme: dark;
+  --ink: #e2e8f0;
+  --slate: #94a3b8;
+  --mist: #0b1220;
+  --paper: #0f172a;
+  --river: #60a5fa;
+  --leaf: #34d399;
+  --sun: #fbbf24;
+  --ember: #fb7185;
+  --glow: rgba(96, 165, 250, 0.2);
+  --card: rgba(15, 23, 42, 0.82);
+  --stroke: rgba(148, 163, 184, 0.18);
+  --accent: #fbbf24;
+  --tree-edge: rgba(226, 232, 240, 0.45);
+  --tree-partner: rgba(251, 191, 36, 0.85);
+  --tree-sibling: rgba(45, 212, 191, 0.45);
+  --tree-label: rgba(226, 232, 240, 0.75);
+  --tree-label-bg: rgba(15, 23, 42, 0.85);
+  --tree-sibling-label: rgba(94, 234, 212, 0.75);
+  --tree-sibling-label-bg: rgba(15, 23, 42, 0.85);
+}
 
-  body {
-    color: var(--ink);
-    background:
-      radial-gradient(1200px 700px at 10% -10%, rgba(96, 165, 250, 0.12), transparent 60%),
-      radial-gradient(900px 600px at 90% 8%, rgba(52, 211, 153, 0.12), transparent 55%),
-      linear-gradient(180deg, #0b1220 0%, #0f172a 55%, #0b1220 100%);
-  }
+html[data-theme="dark"] body {
+  color: var(--ink);
+  background:
+    radial-gradient(1200px 700px at 10% -10%, rgba(96, 165, 250, 0.12), transparent 60%),
+    radial-gradient(900px 600px at 90% 8%, rgba(52, 211, 153, 0.12), transparent 55%),
+    linear-gradient(180deg, #0b1220 0%, #0f172a 55%, #0b1220 100%);
+}
 
-  .glass-card {
-    background: var(--card);
-    border: 1px solid var(--stroke);
-    box-shadow: 0 18px 40px rgba(2, 6, 23, 0.4);
-  }
+html[data-theme="dark"] .glass-card {
+  background: var(--card);
+  border: 1px solid var(--stroke);
+  box-shadow: 0 18px 40px rgba(2, 6, 23, 0.4);
+}
 
-  .surface-card {
-    background: rgba(15, 23, 42, 0.9);
-    border: 1px solid rgba(148, 163, 184, 0.2);
-    box-shadow: 0 16px 30px rgba(2, 6, 23, 0.4);
-  }
+html[data-theme="dark"] .surface-card {
+  background: rgba(15, 23, 42, 0.9);
+  border: 1px solid rgba(148, 163, 184, 0.2);
+  box-shadow: 0 16px 30px rgba(2, 6, 23, 0.4);
+}
 
-  .graph-grid {
-    background-image:
-      repeating-linear-gradient(
-        to bottom,
-        rgba(148, 163, 184, 0.1) 0,
-        rgba(148, 163, 184, 0.1) 140px,
-        transparent 140px,
-        transparent 280px
-      ),
-      radial-gradient(rgba(148, 163, 184, 0.2) 1px, transparent 1px);
-  }
+html[data-theme="dark"] .graph-grid {
+  background-image:
+    repeating-linear-gradient(
+      to bottom,
+      rgba(148, 163, 184, 0.1) 0,
+      rgba(148, 163, 184, 0.1) 140px,
+      transparent 140px,
+      transparent 280px
+    ),
+    radial-gradient(rgba(148, 163, 184, 0.2) 1px, transparent 1px);
+}
 
-  .react-flow__node-person {
-    background: #0b1220;
-    border: 1px solid rgba(148, 163, 184, 0.3);
-    box-shadow: 0 10px 22px rgba(2, 6, 23, 0.4);
-  }
+html[data-theme="dark"] .react-flow__node-person {
+  background: #0b1220;
+  border: 1px solid rgba(148, 163, 184, 0.3);
+  box-shadow: 0 10px 22px rgba(2, 6, 23, 0.4);
+}
 
-  .family-node {
-    background: rgba(251, 191, 36, 0.9);
-    border: 2px solid rgba(251, 191, 36, 0.2);
-    box-shadow: 0 2px 8px rgba(2, 6, 23, 0.4);
-  }
+html[data-theme="dark"] .family-node {
+  border: 2px solid rgba(251, 191, 36, 0.2);
+  box-shadow: 0 2px 8px rgba(2, 6, 23, 0.4);
+}
 
-  .bg-white {
-    background-color: rgba(15, 23, 42, 0.9) !important;
-  }
+html[data-theme="dark"] .bg-white {
+  background-color: rgba(15, 23, 42, 0.9) !important;
+}
 
-  .bg-white\/70 {
-    background-color: rgba(15, 23, 42, 0.7) !important;
-  }
+html[data-theme="dark"] .bg-white\/70 {
+  background-color: rgba(15, 23, 42, 0.7) !important;
+}
 
-  .bg-white\/80 {
-    background-color: rgba(15, 23, 42, 0.8) !important;
-  }
+html[data-theme="dark"] .bg-white\/80 {
+  background-color: rgba(15, 23, 42, 0.8) !important;
+}
 
-  .bg-white\/95 {
-    background-color: rgba(15, 23, 42, 0.95) !important;
-  }
+html[data-theme="dark"] .bg-white\/95 {
+  background-color: rgba(15, 23, 42, 0.95) !important;
+}
 
-  .bg-slate-50 {
-    background-color: rgba(30, 41, 59, 0.7) !important;
-  }
+html[data-theme="dark"] .bg-slate-50 {
+  background-color: rgba(30, 41, 59, 0.7) !important;
+}
 
-  .bg-slate-100 {
-    background-color: rgba(30, 41, 59, 0.85) !important;
-  }
+html[data-theme="dark"] .bg-slate-100 {
+  background-color: rgba(30, 41, 59, 0.85) !important;
+}
 
-  .border-slate-200 {
-    border-color: rgba(148, 163, 184, 0.25) !important;
-  }
+html[data-theme="dark"] .border-slate-200 {
+  border-color: rgba(148, 163, 184, 0.25) !important;
+}
 
-  .text-slate-900 {
-    color: #f8fafc !important;
-  }
+html[data-theme="dark"] .text-slate-900 {
+  color: #f8fafc !important;
+}
 
-  .text-slate-800 {
-    color: #e2e8f0 !important;
-  }
+html[data-theme="dark"] .text-slate-800 {
+  color: #e2e8f0 !important;
+}
 
-  .text-slate-700 {
-    color: #cbd5f5 !important;
-  }
+html[data-theme="dark"] .text-slate-700 {
+  color: #cbd5f5 !important;
+}
 
-  .text-slate-600 {
-    color: #94a3b8 !important;
-  }
+html[data-theme="dark"] .text-slate-600 {
+  color: #94a3b8 !important;
+}
 
-  .text-slate-500 {
-    color: #94a3b8 !important;
-  }
+html[data-theme="dark"] .text-slate-500 {
+  color: #94a3b8 !important;
+}
 
-  .text-slate-400 {
-    color: #94a3b8 !important;
-  }
+html[data-theme="dark"] .text-slate-400 {
+  color: #94a3b8 !important;
 }
 
 .react-flow__edge.edge-parent .react-flow__edge-text,

@@ -1,12 +1,13 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import ReactFlow, {
   Background,
   Controls,
   MiniMap,
   Node,
   type ReactFlowInstance,
+  useNodesState,
 } from "reactflow";
 import "reactflow/dist/style.css";
 import { Lock, Unlock } from "lucide-react";
@@ -96,6 +97,12 @@ export const TreeCanvas = ({
   const [flowInstance, setFlowInstance] = useState<ReactFlowInstance | null>(null);
   const [editingNodeId, setEditingNodeId] = useState("");
   const [isInteractionLocked, setIsInteractionLocked] = useState(true);
+  const [renderNodes, setRenderNodes, onNodesChange] = useNodesState<Node>([]);
+  const positionKey = useMemo(
+    () => JSON.stringify({ positions, manualPositions }),
+    [positions, manualPositions]
+  );
+  const lastPositionKey = useRef(positionKey);
   const hasPeople = persons.length > 0;
   const sortedPersons = useMemo(
     () =>
@@ -403,6 +410,23 @@ export const TreeCanvas = ({
     editingNodeId,
   ]);
 
+  useEffect(() => {
+    const shouldReplacePositions = positionKey !== lastPositionKey.current;
+    setRenderNodes((prev) => {
+      if (prev.length === 0) return interactiveNodes;
+      const prevById = new Map(prev.map((node) => [node.id, node]));
+      return interactiveNodes.map((node) => {
+        const prevNode = prevById.get(node.id);
+        if (!prevNode) return node;
+        return {
+          ...node,
+          position: shouldReplacePositions ? node.position : prevNode.position,
+        };
+      });
+    });
+    lastPositionKey.current = positionKey;
+  }, [interactiveNodes, positionKey, setRenderNodes]);
+
   const handleAutoArrange = async () => {
     if (isArranging || filteredPersons.length === 0) return;
     setIsArranging(true);
@@ -653,11 +677,12 @@ export const TreeCanvas = ({
       </div>
       <div className="graph-grid relative h-full w-full overflow-hidden rounded-3xl border border-slate-200 bg-white/70">
         <ReactFlow
-          nodes={interactiveNodes}
+          nodes={renderNodes}
           edges={edges}
           nodeTypes={nodeTypes}
           fitView
           nodesDraggable={!isInteractionLocked}
+          onNodesChange={onNodesChange}
           onInit={setFlowInstance}
           onNodeClick={(_, node) => {
             if (node.type === "person") {

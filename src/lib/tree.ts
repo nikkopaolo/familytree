@@ -442,7 +442,7 @@ export const buildTreeGraph = ({
   });
 
   const labelStyle = {
-    fill: "rgba(31, 41, 51, 0.75)",
+    fill: "var(--tree-label)",
     fontSize: 10,
     fontWeight: 600,
   };
@@ -511,7 +511,7 @@ export const buildTreeGraph = ({
   const siblingEdges: Edge[] = [];
   const partnerEdges: Edge[] = [];
   const siblingLabelStyle = {
-    fill: "rgba(22, 101, 52, 0.75)",
+    fill: "var(--tree-sibling-label)",
     fontSize: 10,
     fontWeight: 600,
   };
@@ -533,7 +533,7 @@ export const buildTreeGraph = ({
         type: "step",
         animated: false,
         className: "edge-parent",
-        style: { stroke: "rgba(31, 41, 51, 0.7)", strokeWidth: 2.5 },
+        style: { stroke: "var(--tree-edge)", strokeWidth: 3 },
       });
     });
 
@@ -547,11 +547,11 @@ export const buildTreeGraph = ({
         animated: false,
         label: "Child of",
         labelStyle,
-        labelBgStyle: { fill: "rgba(255, 250, 241, 0.9)" },
+        labelBgStyle: { fill: "var(--tree-label-bg)" },
         labelBgPadding: [6, 3] as [number, number],
         labelBgBorderRadius: 8,
         className: "edge-parent",
-        style: { stroke: "rgba(31, 41, 51, 0.7)", strokeWidth: 2.5 },
+        style: { stroke: "var(--tree-edge)", strokeWidth: 3 },
       });
     });
 
@@ -575,13 +575,13 @@ export const buildTreeGraph = ({
           animated: false,
           label: "Sibling of",
           labelStyle: siblingLabelStyle,
-          labelBgStyle: { fill: "rgba(240, 253, 244, 0.9)" },
+          labelBgStyle: { fill: "var(--tree-sibling-label-bg)" },
           labelBgPadding: [6, 3] as [number, number],
           labelBgBorderRadius: 8,
           className: "edge-sibling",
           style: {
-            stroke: "rgba(22, 101, 52, 0.45)",
-            strokeWidth: 2,
+            stroke: "var(--tree-sibling)",
+            strokeWidth: 2.5,
             strokeDasharray: "4 4",
           },
         });
@@ -604,13 +604,13 @@ export const buildTreeGraph = ({
       animated: false,
       label: "Partner of",
       labelStyle,
-      labelBgStyle: { fill: "rgba(255, 250, 241, 0.9)" },
+      labelBgStyle: { fill: "var(--tree-label-bg)" },
       labelBgPadding: [6, 3] as [number, number],
       labelBgBorderRadius: 8,
       className: "edge-partner",
       style: {
-        stroke: "rgba(234, 179, 8, 0.7)",
-        strokeWidth: 2.5,
+        stroke: "var(--tree-partner)",
+        strokeWidth: 3,
         strokeDasharray: "6 4",
       },
     });
