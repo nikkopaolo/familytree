@@ -36,6 +36,15 @@ const normalizeDateInput = (value: unknown) => {
   if (!raw) return null;
   if (/^\d{4}-\d{2}-\d{2}$/.test(raw)) return raw;
   if (/^\d{4}$/.test(raw)) return `${raw}-01-01`;
+  const slashMatch = raw.match(/^(\d{1,2})[\/.-](\d{1,2})[\/.-](\d{4})$/);
+  if (slashMatch) {
+    const day = Number(slashMatch[1]);
+    const month = Number(slashMatch[2]);
+    const year = Number(slashMatch[3]);
+    if (Number.isFinite(day) && Number.isFinite(month) && Number.isFinite(year)) {
+      return `${year}-${String(month).padStart(2, "0")}-${String(day).padStart(2, "0")}`;
+    }
+  }
   return null;
 };
 

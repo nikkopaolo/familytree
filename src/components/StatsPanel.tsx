@@ -13,8 +13,22 @@ import {
   YAxis,
 } from "recharts";
 import type { Person, Relationship } from "@/lib/types";
-import { calculateAge } from "@/lib/utils";
-import { getMonth, isValid, parseISO } from "date-fns";
+import { calculateAge, parseDateValue } from "@/lib/utils";
+import {
+  addDays,
+  addMonths,
+  endOfMonth,
+  endOfWeek,
+  format,
+  getMonth,
+  isBefore,
+  isSameDay,
+  isSameMonth,
+  startOfDay,
+  startOfMonth,
+  startOfWeek,
+  subMonths,
+} from "date-fns";
 
 type StatsPanelProps = {
   persons: Person[];
@@ -43,6 +57,22 @@ const medianValue = (values: number[]) => {
   return (sorted[middle - 1] + sorted[middle]) / 2;
 };
 
+type CalendarEvent = {
+  id: string;
+  date: Date;
+  label: string;
+  type: "birthday" | "death" | "marriage";
+  years: number;
+};
+
+const milestoneMeta = {
+  birthday: { label: "Birthday", dot: "bg-amber-400", text: "text-amber-600" },
+  death: { label: "Memorial", dot: "bg-rose-400", text: "text-rose-600" },
+  marriage: { label: "Anniversary", dot: "bg-emerald-400", text: "text-emerald-600" },
+} as const;
+
+const weekDays = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
+
 export const StatsPanel = ({
   persons,
   relationships = [],
@@ -55,6 +85,8 @@ export const StatsPanel = ({
   const [selectedStatus, setSelectedStatus] = useState<"alive" | "deceased" | null>(null);
   const [selectedLocation, setSelectedLocation] = useState<string | null>(null);
   const [familyPage, setFamilyPage] = useState(1);
+  const [calendarMonth, setCalendarMonth] = useState<Date>(() => startOfMonth(new Date()));
+  const [calendarDay, setCalendarDay] = useState<Date | null>(() => startOfDay(new Date()));
   const familyPageSize = 5;
   const personById = useMemo(
     () => new Map(persons.map((person) => [person.id, person])),
@@ -69,11 +101,37 @@ export const StatsPanel = ({
   useEffect(() => {
     if (forcedMonth === undefined) return;
     setSelectedMonth(forcedMonth);
+    if (forcedMonth === null) return;
+    const nextMonth = new Date();
+    nextMonth.setMonth(forcedMonth);
+    setCalendarMonth(startOfMonth(nextMonth));
   }, [forcedMonth]);
+
+  useEffect(() => {
+    if (!calendarDay || !isSameMonth(calendarDay, calendarMonth)) {
+      setCalendarDay(startOfMonth(calendarMonth));
+    }
+  }, [calendarDay, calendarMonth]);
 
   const handleMonthSelect = (month: number | null) => {
     setSelectedMonth(month);
     onMonthChange?.(month);
+  };
+
+  const handleCalendarShift = (direction: "prev" | "next") => {
+    const nextMonth =
+      direction === "next" ? addMonths(calendarMonth, 1) : subMonths(calendarMonth, 1);
+    setCalendarMonth(nextMonth);
+    handleMonthSelect(nextMonth.getMonth());
+  };
+
+  const handleCalendarDaySelect = (day: Date) => {
+    const normalized = startOfDay(day);
+    if (!isSameMonth(normalized, calendarMonth)) {
+      setCalendarMonth(startOfMonth(normalized));
+    }
+    setCalendarDay(normalized);
+    handleMonthSelect(normalized.getMonth());
   };
 
   const birthsByMonth = useMemo(() => {
@@ -83,8 +141,8 @@ export const StatsPanel = ({
     }));
     persons.forEach((person) => {
       if (!person.birthDate) return;
-      const parsed = parseISO(person.birthDate);
-      if (!isValid(parsed)) return;
+      const parsed = parseDateValue(person.birthDate);
+      if (!parsed) return;
       counts[getMonth(parsed)].count += 1;
     });
     return counts.map((entry) => ({
@@ -101,8 +159,8 @@ export const StatsPanel = ({
     }));
     persons.forEach((person) => {
       if (!person.deathDate) return;
-      const parsed = parseISO(person.deathDate);
-      if (!isValid(parsed)) return;
+      const parsed = parseDateValue(person.deathDate);
+      if (!parsed) return;
       counts[getMonth(parsed)].count += 1;
     });
     return counts.map((entry) => ({
@@ -119,8 +177,8 @@ export const StatsPanel = ({
     }));
     relationships.forEach((rel) => {
       if (rel.relationshipType !== "partner" || !rel.marriageDate) return;
-      const parsed = parseISO(rel.marriageDate);
-      if (!isValid(parsed)) return;
+      const parsed = parseDateValue(rel.marriageDate);
+      if (!parsed) return;
       counts[getMonth(parsed)].count += 1;
     });
     return counts.map((entry) => ({
@@ -129,6 +187,117 @@ export const StatsPanel = ({
       count: entry.count,
     }));
   }, [relationships]);
+
+  const calendarEvents = useMemo(() => {
+    const monthIndex = calendarMonth.getMonth();
+    const year = calendarMonth.getFullYear();
+    const events: CalendarEvent[] = [];
+    const buildOccurrence = (source: Date) => {
+      const candidate = new Date(year, source.getMonth(), source.getDate());
+      if (candidate.getMonth() !== source.getMonth()) return null;
+      return candidate;
+    };
+
+    persons.forEach((person) => {
+      if (!person.birthDate) return;
+      const parsed = parseDateValue(person.birthDate);
+      if (!parsed) return;
+      const occurrence = buildOccurrence(parsed);
+      if (!occurrence || occurrence.getMonth() !== monthIndex) return;
+      events.push({
+        id: `birthday-${person.id}`,
+        date: occurrence,
+        label: person.fullName,
+        type: "birthday",
+        years: year - parsed.getFullYear(),
+      });
+    });
+
+    persons.forEach((person) => {
+      if (!person.deathDate) return;
+      const parsed = parseDateValue(person.deathDate);
+      if (!parsed) return;
+      const occurrence = buildOccurrence(parsed);
+      if (!occurrence || occurrence.getMonth() !== monthIndex) return;
+      events.push({
+        id: `death-${person.id}`,
+        date: occurrence,
+        label: person.fullName,
+        type: "death",
+        years: year - parsed.getFullYear(),
+      });
+    });
+
+    relationships.forEach((rel) => {
+      if (rel.relationshipType !== "partner" || !rel.marriageDate) return;
+      const parsed = parseDateValue(rel.marriageDate);
+      if (!parsed) return;
+      const occurrence = buildOccurrence(parsed);
+      if (!occurrence || occurrence.getMonth() !== monthIndex) return;
+      const partnerA = personById.get(rel.parentId);
+      const partnerB = personById.get(rel.childId);
+      events.push({
+        id: `marriage-${rel.id}`,
+        date: occurrence,
+        label: `${partnerA?.fullName ?? "Unknown member"} & ${partnerB?.fullName ?? "Unknown member"}`,
+        type: "marriage",
+        years: year - parsed.getFullYear(),
+      });
+    });
+
+    return events.sort(
+      (a, b) => a.date.getTime() - b.date.getTime() || a.label.localeCompare(b.label)
+    );
+  }, [calendarMonth, persons, personById, relationships]);
+
+  const calendarEventsByDay = useMemo(() => {
+    const map = new Map<string, CalendarEvent[]>();
+    calendarEvents.forEach((event) => {
+      const key = format(event.date, "yyyy-MM-dd");
+      const bucket = map.get(key) ?? [];
+      bucket.push(event);
+      map.set(key, bucket);
+    });
+    return map;
+  }, [calendarEvents]);
+
+  const calendarDays = useMemo(() => {
+    const monthStart = startOfMonth(calendarMonth);
+    const monthEnd = endOfMonth(calendarMonth);
+    const start = startOfWeek(monthStart);
+    const end = endOfWeek(monthEnd);
+    const days: Date[] = [];
+    let cursor = start;
+    while (cursor <= end) {
+      days.push(cursor);
+      cursor = addDays(cursor, 1);
+    }
+    return days;
+  }, [calendarMonth]);
+
+  const calendarDayEvents = useMemo(() => {
+    if (!calendarDay) return [];
+    const key = format(calendarDay, "yyyy-MM-dd");
+    return calendarEventsByDay.get(key) ?? [];
+  }, [calendarDay, calendarEventsByDay]);
+
+  const calendarUpcomingEvents = useMemo(() => {
+    const today = startOfDay(new Date());
+    const isCurrentMonth = isSameMonth(calendarMonth, today);
+    return calendarEvents
+      .filter((event) => (isCurrentMonth ? !isBefore(event.date, today) : true))
+      .sort(
+        (a, b) => a.date.getTime() - b.date.getTime() || a.label.localeCompare(b.label)
+      );
+  }, [calendarEvents, calendarMonth]);
+
+  const calendarListEvents =
+    calendarDayEvents.length > 0 ? calendarDayEvents : calendarUpcomingEvents;
+  const calendarListLabel =
+    calendarDayEvents.length > 0 && calendarDay
+      ? `Milestones on ${format(calendarDay, "MMM d")}`
+      : `Upcoming in ${format(calendarMonth, "MMMM")}`;
+  const today = startOfDay(new Date());
 
   const ageDistribution = useMemo(() => {
     return ageBuckets.map((bucket) => {
@@ -187,8 +356,8 @@ export const StatsPanel = ({
     return persons
       .filter((person) => person.birthDate)
       .map((person) => {
-        const parsed = parseISO(person.birthDate ?? "");
-        if (!isValid(parsed)) return null;
+        const parsed = parseDateValue(person.birthDate ?? "");
+        if (!parsed) return null;
         if (getMonth(parsed) !== selectedMonth) return null;
         return {
           person,
@@ -206,8 +375,8 @@ export const StatsPanel = ({
     return persons
       .filter((person) => person.deathDate)
       .map((person) => {
-        const parsed = parseISO(person.deathDate ?? "");
-        if (!isValid(parsed)) return null;
+        const parsed = parseDateValue(person.deathDate ?? "");
+        if (!parsed) return null;
         if (getMonth(parsed) !== selectedMonth) return null;
         return {
           person,
@@ -227,8 +396,8 @@ export const StatsPanel = ({
     return relationships
       .filter((rel) => rel.relationshipType === "partner" && rel.marriageDate)
       .map((rel) => {
-        const parsed = parseISO(rel.marriageDate ?? "");
-        if (!isValid(parsed)) return null;
+        const parsed = parseDateValue(rel.marriageDate ?? "");
+        if (!parsed) return null;
         if (getMonth(parsed) !== selectedMonth) return null;
         const parent = personById.get(rel.parentId);
         const child = personById.get(rel.childId);
@@ -257,8 +426,8 @@ export const StatsPanel = ({
     const counts = new Map<number, number>();
     persons.forEach((person) => {
       if (!person.birthDate) return;
-      const parsed = parseISO(person.birthDate);
-      if (!isValid(parsed)) return;
+      const parsed = parseDateValue(person.birthDate);
+      if (!parsed) return;
       const decade = Math.floor(parsed.getFullYear() / 10) * 10;
       counts.set(decade, (counts.get(decade) ?? 0) + 1);
     });
@@ -271,8 +440,8 @@ export const StatsPanel = ({
     const counts = new Map<number, number>();
     persons.forEach((person) => {
       if (!person.deathDate) return;
-      const parsed = parseISO(person.deathDate);
-      if (!isValid(parsed)) return;
+      const parsed = parseDateValue(person.deathDate);
+      if (!parsed) return;
       const decade = Math.floor(parsed.getFullYear() / 10) * 10;
       counts.set(decade, (counts.get(decade) ?? 0) + 1);
     });
@@ -690,6 +859,112 @@ export const StatsPanel = ({
                   </div>
                 </div>
               </div>
+            )}
+          </div>
+        </div>
+      </div>
+      <div className="glass-card rounded-3xl p-6">
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <div>
+            <h2 className="text-2xl text-slate-900">Milestone Calendar</h2>
+            <p className="text-sm text-slate-600">
+              Upcoming birthdays, memorials, and anniversaries in a monthly view.
+            </p>
+          </div>
+          <div className="flex items-center gap-2">
+            <button
+              className="rounded-full border border-slate-200 bg-white px-3 py-1 text-xs font-semibold text-slate-600"
+              onClick={() => handleCalendarShift("prev")}
+              type="button"
+            >
+              Previous
+            </button>
+            <span className="text-sm font-semibold text-slate-700">
+              {format(calendarMonth, "MMMM yyyy")}
+            </span>
+            <button
+              className="rounded-full border border-slate-200 bg-white px-3 py-1 text-xs font-semibold text-slate-600"
+              onClick={() => handleCalendarShift("next")}
+              type="button"
+            >
+              Next
+            </button>
+          </div>
+        </div>
+        <div className="mt-6 grid gap-6 lg:grid-cols-[1.1fr_0.9fr]">
+          <div className="rounded-2xl border border-slate-200 bg-white/70 p-4">
+            <div className="grid grid-cols-7 text-center text-xs font-semibold uppercase tracking-[0.2em] text-slate-400">
+              {weekDays.map((day) => (
+                <span key={day}>{day}</span>
+              ))}
+            </div>
+            <div className="mt-3 grid grid-cols-7 gap-2 text-sm">
+              {calendarDays.map((day) => {
+                const dayKey = format(day, "yyyy-MM-dd");
+                const dayEvents = calendarEventsByDay.get(dayKey) ?? [];
+                const isOutside = !isSameMonth(day, calendarMonth);
+                const isSelected = calendarDay ? isSameDay(day, calendarDay) : false;
+                const isToday = isSameDay(day, today);
+                return (
+                  <button
+                    key={dayKey}
+                    className={`flex flex-col items-center justify-center rounded-xl border px-2 py-2 text-xs transition ${
+                      isSelected
+                        ? "border-amber-300 bg-amber-50 text-slate-900"
+                        : "border-transparent hover:border-slate-200 hover:bg-white"
+                    } ${isOutside ? "text-slate-400" : "text-slate-700"}`}
+                    onClick={() => handleCalendarDaySelect(day)}
+                    type="button"
+                  >
+                    <span className={`text-xs font-semibold ${isToday ? "text-amber-600" : ""}`}>
+                      {format(day, "d")}
+                    </span>
+                    <div className="mt-1 flex items-center gap-1">
+                      {(["birthday", "marriage", "death"] as const).map((type) =>
+                        dayEvents.some((event) => event.type === type) ? (
+                          <span key={type} className={`h-2 w-2 rounded-full ${milestoneMeta[type].dot}`} />
+                        ) : null
+                      )}
+                    </div>
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+          <div className="rounded-2xl border border-slate-200 bg-white/80 p-4">
+            <div className="flex items-center justify-between">
+              <p className="text-xs font-semibold uppercase tracking-[0.2em] text-slate-500">
+                {calendarListLabel}
+              </p>
+              <button
+                className="rounded-full border border-slate-200 bg-white px-3 py-1 text-xs font-semibold text-slate-600"
+                onClick={() => handleCalendarDaySelect(today)}
+                type="button"
+              >
+                Today
+              </button>
+            </div>
+            {calendarListEvents.length === 0 ? (
+              <p className="mt-3 text-sm text-slate-500">No milestones scheduled.</p>
+            ) : (
+              <ul className="mt-3 max-h-64 space-y-2 overflow-auto text-sm">
+                {calendarListEvents.map((event) => (
+                  <li key={event.id} className="flex items-center justify-between gap-3">
+                    <div className="flex min-w-0 items-center gap-2">
+                      <span className={`h-2 w-2 rounded-full ${milestoneMeta[event.type].dot}`} />
+                      <div className="min-w-0">
+                        <p className="truncate font-semibold text-slate-800">{event.label}</p>
+                        <p className={`text-xs ${milestoneMeta[event.type].text}`}>
+                          {milestoneMeta[event.type].label}
+                        </p>
+                      </div>
+                    </div>
+                    <span className="shrink-0 text-xs text-slate-500">
+                      {format(event.date, "MMM d")} - {event.years} yrs
+                    </span>
+                  </li>
+                ))}
+              </ul>
             )}
           </div>
         </div>

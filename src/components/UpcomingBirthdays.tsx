@@ -1,8 +1,9 @@
 "use client";
 
 import { useMemo } from "react";
-import { addYears, format, isBefore, isValid, parseISO, startOfDay } from "date-fns";
+import { addYears, format, isBefore, startOfDay } from "date-fns";
 import type { Person, Relationship } from "@/lib/types";
+import { parseDateValue } from "@/lib/utils";
 
 type UpcomingBirthdaysProps = {
   persons: Person[];
@@ -29,8 +30,8 @@ export const UpcomingBirthdays = ({
     const birthdays = persons
       .map((person) => {
         if (!person.birthDate) return null;
-        const parsed = parseISO(person.birthDate);
-        if (!isValid(parsed)) return null;
+        const parsed = parseDateValue(person.birthDate);
+        if (!parsed) return null;
         const nextDate = getNextDate(parsed);
         return {
           id: person.id,
@@ -49,8 +50,8 @@ export const UpcomingBirthdays = ({
     const deathAnniversaries = persons
       .map((person) => {
         if (!person.deathDate) return null;
-        const parsed = parseISO(person.deathDate);
-        if (!isValid(parsed)) return null;
+        const parsed = parseDateValue(person.deathDate);
+        if (!parsed) return null;
         const nextDate = getNextDate(parsed);
         return {
           id: person.id,
@@ -69,8 +70,8 @@ export const UpcomingBirthdays = ({
     const marriageAnniversaries = relationships
       .filter((rel) => rel.relationshipType === "partner" && rel.marriageDate)
       .map((rel) => {
-        const parsed = parseISO(rel.marriageDate ?? "");
-        if (!isValid(parsed)) return null;
+        const parsed = parseDateValue(rel.marriageDate ?? "");
+        if (!parsed) return null;
         const nextDate = getNextDate(parsed);
         const partnerA = personById.get(rel.parentId);
         const partnerB = personById.get(rel.childId);
