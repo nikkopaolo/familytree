@@ -52,7 +52,7 @@ const tabs: Array<{
 export const TabNav = ({ activeTab, onChange, showSuggestions = true }: TabNavProps) => {
   const visibleTabs = showSuggestions ? tabs : tabs.filter((tab) => tab.id !== "suggestions");
   return (
-    <div className="mx-auto mt-3 flex w-[min(1440px,96vw)] flex-wrap items-center gap-2 rounded-2xl border border-white/70 bg-white/60 px-3 py-2 shadow-sm backdrop-blur">
+    <div className="mx-auto mt-3 flex w-[min(1600px,98vw)] flex-wrap items-center gap-2 rounded-2xl border border-white/70 bg-white/60 px-3 py-2 shadow-sm backdrop-blur">
       {visibleTabs.map((tab) => (
         <button
           key={tab.id}

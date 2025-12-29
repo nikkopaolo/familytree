@@ -19,6 +19,8 @@ import { getMonth, isValid, parseISO } from "date-fns";
 type StatsPanelProps = {
   persons: Person[];
   relationships?: Relationship[];
+  forcedMonth?: number | null;
+  onMonthChange?: (month: number | null) => void;
 };
 
 const ageBuckets = [
@@ -41,10 +43,15 @@ const medianValue = (values: number[]) => {
   return (sorted[middle - 1] + sorted[middle]) / 2;
 };
 
-export const StatsPanel = ({ persons, relationships = [] }: StatsPanelProps) => {
+export const StatsPanel = ({
+  persons,
+  relationships = [],
+  forcedMonth,
+  onMonthChange,
+}: StatsPanelProps) => {
   const aliveCount = persons.filter((person) => person.isAlive).length;
   const deceasedCount = persons.length - aliveCount;
-  const [selectedMonth, setSelectedMonth] = useState<number | null>(null);
+  const [selectedMonth, setSelectedMonth] = useState<number | null>(forcedMonth ?? null);
   const [selectedStatus, setSelectedStatus] = useState<"alive" | "deceased" | null>(null);
   const [selectedLocation, setSelectedLocation] = useState<string | null>(null);
   const [familyPage, setFamilyPage] = useState(1);
@@ -58,6 +65,16 @@ export const StatsPanel = ({ persons, relationships = [] }: StatsPanelProps) => 
     { name: "Alive", value: aliveCount },
     { name: "Deceased", value: deceasedCount },
   ];
+
+  useEffect(() => {
+    if (forcedMonth === undefined) return;
+    setSelectedMonth(forcedMonth);
+  }, [forcedMonth]);
+
+  const handleMonthSelect = (month: number | null) => {
+    setSelectedMonth(month);
+    onMonthChange?.(month);
+  };
 
   const birthsByMonth = useMemo(() => {
     const counts = Array.from({ length: 12 }, (_, index) => ({
@@ -76,6 +93,42 @@ export const StatsPanel = ({ persons, relationships = [] }: StatsPanelProps) => 
       count: entry.count,
     }));
   }, [persons]);
+
+  const deathsByMonth = useMemo(() => {
+    const counts = Array.from({ length: 12 }, (_, index) => ({
+      month: index,
+      count: 0,
+    }));
+    persons.forEach((person) => {
+      if (!person.deathDate) return;
+      const parsed = parseISO(person.deathDate);
+      if (!isValid(parsed)) return;
+      counts[getMonth(parsed)].count += 1;
+    });
+    return counts.map((entry) => ({
+      monthIndex: entry.month,
+      monthLabel: new Date(0, entry.month).toLocaleString("en-US", { month: "short" }),
+      count: entry.count,
+    }));
+  }, [persons]);
+
+  const marriagesByMonth = useMemo(() => {
+    const counts = Array.from({ length: 12 }, (_, index) => ({
+      month: index,
+      count: 0,
+    }));
+    relationships.forEach((rel) => {
+      if (rel.relationshipType !== "partner" || !rel.marriageDate) return;
+      const parsed = parseISO(rel.marriageDate);
+      if (!isValid(parsed)) return;
+      counts[getMonth(parsed)].count += 1;
+    });
+    return counts.map((entry) => ({
+      monthIndex: entry.month,
+      monthLabel: new Date(0, entry.month).toLocaleString("en-US", { month: "short" }),
+      count: entry.count,
+    }));
+  }, [relationships]);
 
   const ageDistribution = useMemo(() => {
     return ageBuckets.map((bucket) => {
@@ -453,39 +506,98 @@ export const StatsPanel = ({ persons, relationships = [] }: StatsPanelProps) => 
         <div className="glass-card rounded-3xl p-6">
           <div className="flex flex-wrap items-center justify-between gap-3">
             <div>
-              <h2 className="text-2xl text-slate-900">Birthdays Across the Year</h2>
+              <h2 className="text-2xl text-slate-900">Milestones Across the Year</h2>
               <p className="text-sm text-slate-600">
-                Click a month to see birthdays and anniversaries.
+                Click a month to see birthdays, memorials, and marriage anniversaries.
               </p>
             </div>
             <button
               className="rounded-full border border-slate-200 bg-white px-4 py-2 text-xs font-semibold text-slate-600"
-              onClick={() => setSelectedMonth(null)}
+              onClick={() => handleMonthSelect(null)}
               type="button"
             >
               Clear selection
             </button>
           </div>
-          <div className="mt-6 h-64">
-            <ResponsiveContainer width="100%" height="100%">
-              <BarChart data={birthsByMonth}>
-                <XAxis dataKey="monthLabel" fontSize={12} />
-                <YAxis allowDecimals={false} fontSize={12} />
-                <Tooltip />
-                <Bar
-                  dataKey="count"
-                  radius={[10, 10, 0, 0]}
-                  onClick={(data) => setSelectedMonth(data?.monthIndex ?? null)}
-                >
-                  {birthsByMonth.map((entry) => (
-                    <Cell
-                      key={entry.monthIndex}
-                      fill={selectedMonth === entry.monthIndex ? "#f08b32" : "#f1b34c"}
-                    />
-                  ))}
-                </Bar>
-              </BarChart>
-            </ResponsiveContainer>
+          <div className="mt-6 grid gap-4 lg:grid-cols-3">
+            <div className="rounded-2xl border border-slate-200 bg-white/70 p-3">
+              <p className="text-xs font-semibold uppercase tracking-[0.2em] text-slate-500">
+                Birthdays
+              </p>
+              <div className="mt-3 h-40">
+                <ResponsiveContainer width="100%" height="100%">
+                  <BarChart data={birthsByMonth}>
+                    <XAxis dataKey="monthLabel" fontSize={10} />
+                    <YAxis allowDecimals={false} fontSize={10} />
+                    <Tooltip />
+                    <Bar
+                      dataKey="count"
+                      radius={[8, 8, 0, 0]}
+                      onClick={(data) => handleMonthSelect(data?.monthIndex ?? null)}
+                    >
+                      {birthsByMonth.map((entry) => (
+                        <Cell
+                          key={entry.monthIndex}
+                          fill={selectedMonth === entry.monthIndex ? "#f08b32" : "#f1b34c"}
+                        />
+                      ))}
+                    </Bar>
+                  </BarChart>
+                </ResponsiveContainer>
+              </div>
+            </div>
+            <div className="rounded-2xl border border-slate-200 bg-white/70 p-3">
+              <p className="text-xs font-semibold uppercase tracking-[0.2em] text-slate-500">
+                Deaths
+              </p>
+              <div className="mt-3 h-40">
+                <ResponsiveContainer width="100%" height="100%">
+                  <BarChart data={deathsByMonth}>
+                    <XAxis dataKey="monthLabel" fontSize={10} />
+                    <YAxis allowDecimals={false} fontSize={10} />
+                    <Tooltip />
+                    <Bar
+                      dataKey="count"
+                      radius={[8, 8, 0, 0]}
+                      onClick={(data) => handleMonthSelect(data?.monthIndex ?? null)}
+                    >
+                      {deathsByMonth.map((entry) => (
+                        <Cell
+                          key={entry.monthIndex}
+                          fill={selectedMonth === entry.monthIndex ? "#c44536" : "#d07f6f"}
+                        />
+                      ))}
+                    </Bar>
+                  </BarChart>
+                </ResponsiveContainer>
+              </div>
+            </div>
+            <div className="rounded-2xl border border-slate-200 bg-white/70 p-3">
+              <p className="text-xs font-semibold uppercase tracking-[0.2em] text-slate-500">
+                Marriages
+              </p>
+              <div className="mt-3 h-40">
+                <ResponsiveContainer width="100%" height="100%">
+                  <BarChart data={marriagesByMonth}>
+                    <XAxis dataKey="monthLabel" fontSize={10} />
+                    <YAxis allowDecimals={false} fontSize={10} />
+                    <Tooltip />
+                    <Bar
+                      dataKey="count"
+                      radius={[8, 8, 0, 0]}
+                      onClick={(data) => handleMonthSelect(data?.monthIndex ?? null)}
+                    >
+                      {marriagesByMonth.map((entry) => (
+                        <Cell
+                          key={entry.monthIndex}
+                          fill={selectedMonth === entry.monthIndex ? "#2f6f4e" : "#6fa37f"}
+                        />
+                      ))}
+                    </Bar>
+                  </BarChart>
+                </ResponsiveContainer>
+              </div>
+            </div>
           </div>
           <div className="mt-6 rounded-2xl border border-slate-200 bg-white/80 p-4">
             <p className="text-xs font-semibold uppercase tracking-[0.2em] text-slate-500">

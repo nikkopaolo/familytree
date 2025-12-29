@@ -7,9 +7,14 @@ import type { Person, Relationship } from "@/lib/types";
 type UpcomingBirthdaysProps = {
   persons: Person[];
   relationships?: Relationship[];
+  onSelectDate?: (date: Date) => void;
 };
 
-export const UpcomingBirthdays = ({ persons, relationships = [] }: UpcomingBirthdaysProps) => {
+export const UpcomingBirthdays = ({
+  persons,
+  relationships = [],
+  onSelectDate,
+}: UpcomingBirthdaysProps) => {
   const { birthdays, marriageAnniversaries, deathAnniversaries } = useMemo(() => {
     const today = startOfDay(new Date());
     const limit = 6;
@@ -96,6 +101,11 @@ export const UpcomingBirthdays = ({ persons, relationships = [] }: UpcomingBirth
     };
   }, [persons, relationships]);
 
+  const handleSelect = (date: Date) => {
+    if (!onSelectDate) return;
+    onSelectDate(new Date(date));
+  };
+
   return (
     <aside className="glass-card rounded-3xl p-6">
       <h3 className="text-xl text-slate-900">Upcoming milestones</h3>
@@ -112,13 +122,19 @@ export const UpcomingBirthdays = ({ persons, relationships = [] }: UpcomingBirth
           ) : (
             <ul className="mt-2 space-y-2">
               {birthdays.map((entry) => (
-                <li key={entry.id} className="flex items-center justify-between gap-3">
-                  <span className="min-w-0 truncate font-semibold text-slate-800">
-                    {entry.fullName}
-                  </span>
-                  <span className="shrink-0 text-xs text-slate-500">
-                    {format(entry.date, "MMM d")} - Turning {entry.turning}
-                  </span>
+                <li key={entry.id}>
+                  <button
+                    className="flex w-full items-start justify-between gap-3 rounded-xl border border-transparent px-2 py-2 text-left transition hover:border-amber-200 hover:bg-amber-50"
+                    onClick={() => handleSelect(entry.date)}
+                    type="button"
+                  >
+                    <span className="flex-1 break-words font-semibold text-slate-800">
+                      {entry.fullName}
+                    </span>
+                    <span className="shrink-0 text-xs text-slate-500">
+                      {format(entry.date, "MMM d")} - Turning {entry.turning}
+                    </span>
+                  </button>
                 </li>
               ))}
             </ul>
@@ -133,13 +149,19 @@ export const UpcomingBirthdays = ({ persons, relationships = [] }: UpcomingBirth
           ) : (
             <ul className="mt-2 space-y-2">
               {marriageAnniversaries.map((entry) => (
-                <li key={entry.id} className="flex items-center justify-between gap-3">
-                  <span className="min-w-0 truncate font-semibold text-slate-800">
-                    {entry.label}
-                  </span>
-                  <span className="shrink-0 text-xs text-slate-500">
-                    {format(entry.date, "MMM d")} - {entry.years} years
-                  </span>
+                <li key={entry.id}>
+                  <button
+                    className="flex w-full items-start justify-between gap-3 rounded-xl border border-transparent px-2 py-2 text-left transition hover:border-amber-200 hover:bg-amber-50"
+                    onClick={() => handleSelect(entry.date)}
+                    type="button"
+                  >
+                    <span className="flex-1 break-words font-semibold text-slate-800">
+                      {entry.label}
+                    </span>
+                    <span className="shrink-0 text-xs text-slate-500">
+                      {format(entry.date, "MMM d")} - {entry.years} years
+                    </span>
+                  </button>
                 </li>
               ))}
             </ul>
@@ -154,13 +176,19 @@ export const UpcomingBirthdays = ({ persons, relationships = [] }: UpcomingBirth
           ) : (
             <ul className="mt-2 space-y-2">
               {deathAnniversaries.map((entry) => (
-                <li key={entry.id} className="flex items-center justify-between gap-3">
-                  <span className="min-w-0 truncate font-semibold text-slate-800">
-                    {entry.fullName}
-                  </span>
-                  <span className="shrink-0 text-xs text-slate-500">
-                    {format(entry.date, "MMM d")} - {entry.years} years
-                  </span>
+                <li key={entry.id}>
+                  <button
+                    className="flex w-full items-start justify-between gap-3 rounded-xl border border-transparent px-2 py-2 text-left transition hover:border-amber-200 hover:bg-amber-50"
+                    onClick={() => handleSelect(entry.date)}
+                    type="button"
+                  >
+                    <span className="flex-1 break-words font-semibold text-slate-800">
+                      {entry.fullName}
+                    </span>
+                    <span className="shrink-0 text-xs text-slate-500">
+                      {format(entry.date, "MMM d")} - {entry.years} years
+                    </span>
+                  </button>
                 </li>
               ))}
             </ul>
