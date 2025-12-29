@@ -165,7 +165,7 @@ export default function Home() {
         }}
       />
       <TabNav activeTab={activeTab} onChange={setActiveTab} showSuggestions={false} />
-      <div className="mx-auto mt-4 grid w-[calc(100%-32px)] max-w-none grid-cols-1 gap-5 xl:grid-cols-[minmax(0,1fr)_340px]">
+      <div className="mx-auto mt-4 grid w-[calc(100%-32px)] max-w-none grid-cols-1 gap-5 xl:grid-cols-[minmax(0,1fr)_360px]">
         <section className="flex flex-col gap-6">
           <div className="glass-card rounded-3xl px-5 py-3">
             <div className="grid divide-y divide-slate-200 sm:grid-cols-3 sm:divide-y-0 sm:divide-x">
@@ -182,47 +182,74 @@ export default function Home() {
             </div>
           </div>
           {activeTab === "tree" && (
-            <TreeCanvas
-              persons={clanPersons}
-              relationships={clanRelationships}
-              positions={clanPositions}
-              manualPositions={manualPositions}
-              canEditPerson={canEditPerson}
-              onAddChild={(parentId) => setAddChildParentId(parentId)}
-              onAddPartner={async (personId) => {
-                const newPerson = await createPerson({ fullName: "New Member" });
-                if (newPerson) {
-                  await createPartnerRelationship(personId, newPerson.id);
-                  setSelectedPersonId(newPerson.id);
+            <>
+              <TreeCanvas
+                persons={clanPersons}
+                relationships={clanRelationships}
+                positions={clanPositions}
+                manualPositions={manualPositions}
+                canEditPerson={canEditPerson}
+                onAddChild={(parentId) => setAddChildParentId(parentId)}
+                onAddPartner={async (personId) => {
+                  const newPerson = await createPerson({ fullName: "New Member" });
+                  if (newPerson) {
+                    await createPartnerRelationship(personId, newPerson.id);
+                    setSelectedPersonId(newPerson.id);
+                  }
+                }}
+                onUpdatePerson={handleInlineUpdate}
+                onDeleteRelationship={deleteRelationship}
+                onLinkParent={(childId, parentId) =>
+                  createParentChildRelationship(parentId, childId)
                 }
-              }}
-              onUpdatePerson={handleInlineUpdate}
-              onDeleteRelationship={deleteRelationship}
-              onLinkParent={(childId, parentId) =>
-                createParentChildRelationship(parentId, childId)
-              }
-              onLinkChild={(parentId, childId) =>
-                createParentChildRelationship(parentId, childId)
-              }
-              onLinkPartner={(personId, partnerId, marriageDate) =>
-                createPartnerRelationship(personId, partnerId, marriageDate)
-              }
-              onUpdatePosition={updateManualPosition}
-              selectedPersonId={selectedPersonId}
-              onSelectPerson={setSelectedPersonId}
-              rootId={rootId}
-              onRootChange={setRootId}
-              maxDepth={unlimitedGenerations ? Number.POSITIVE_INFINITY : maxDepth}
-              onMaxDepthChange={setMaxDepth}
-              maxDepthValue={maxDepth}
-              isMaxDepthUnlimited={unlimitedGenerations}
-              onToggleMaxDepthUnlimited={setUnlimitedGenerations}
-              maxNodes={unlimitedNodes ? Number.POSITIVE_INFINITY : maxNodes}
-              onMaxNodesChange={setMaxNodes}
-              maxNodesValue={maxNodes}
-              isMaxNodesUnlimited={unlimitedNodes}
-              onToggleMaxNodesUnlimited={setUnlimitedNodes}
-            />
+                onLinkChild={(parentId, childId) =>
+                  createParentChildRelationship(parentId, childId)
+                }
+                onLinkPartner={(personId, partnerId, marriageDate) =>
+                  createPartnerRelationship(personId, partnerId, marriageDate)
+                }
+                onUpdatePosition={updateManualPosition}
+                selectedPersonId={selectedPersonId}
+                onSelectPerson={setSelectedPersonId}
+                rootId={rootId}
+                onRootChange={setRootId}
+                maxDepth={unlimitedGenerations ? Number.POSITIVE_INFINITY : maxDepth}
+                onMaxDepthChange={setMaxDepth}
+                maxDepthValue={maxDepth}
+                isMaxDepthUnlimited={unlimitedGenerations}
+                onToggleMaxDepthUnlimited={setUnlimitedGenerations}
+                maxNodes={unlimitedNodes ? Number.POSITIVE_INFINITY : maxNodes}
+                onMaxNodesChange={setMaxNodes}
+                maxNodesValue={maxNodes}
+                isMaxNodesUnlimited={unlimitedNodes}
+                onToggleMaxNodesUnlimited={setUnlimitedNodes}
+              />
+              <div className="mx-auto w-full max-w-5xl">
+                <PersonDetails
+                  person={selectedPerson}
+                  persons={clanPersons}
+                  relationships={clanRelationships}
+                  canEdit={selectedPerson ? canEditPerson(selectedPerson) : false}
+                  onSubmitUpdate={handleSubmitUpdate}
+                  onAddParentChild={(parentId, childId) =>
+                    createParentChildRelationship(parentId, childId)
+                  }
+                  onAddPartner={(personId, partnerId, marriageDate) =>
+                    createPartnerRelationship(personId, partnerId, marriageDate)
+                  }
+                  onUpdateRelationship={updateRelationship}
+                  onDelete={deletePerson}
+                  canUploadPhoto={Boolean(
+                    selectedPerson && canEditPerson(selectedPerson) && isSupabaseEnabled && !isGuest
+                  )}
+                  onUploadPhoto={
+                    selectedPerson
+                      ? (file) => uploadPersonPhoto(selectedPerson.id, file)
+                      : undefined
+                  }
+                />
+              </div>
+            </>
           )}
           {activeTab === "list" && (
             <>
@@ -273,25 +300,31 @@ export default function Home() {
             onSignOut={signOut}
             adminBootstrapError={adminBootstrapError}
           />
-          <PersonDetails
-            person={selectedPerson}
-            persons={clanPersons}
-            relationships={clanRelationships}
-            canEdit={selectedPerson ? canEditPerson(selectedPerson) : false}
-            onSubmitUpdate={handleSubmitUpdate}
-            onAddParentChild={(parentId, childId) => createParentChildRelationship(parentId, childId)}
-            onAddPartner={(personId, partnerId, marriageDate) =>
-              createPartnerRelationship(personId, partnerId, marriageDate)
-            }
-            onUpdateRelationship={updateRelationship}
-            onDelete={deletePerson}
-            canUploadPhoto={Boolean(selectedPerson && canEditPerson(selectedPerson) && isSupabaseEnabled && !isGuest)}
-            onUploadPhoto={
-              selectedPerson
-                ? (file) => uploadPersonPhoto(selectedPerson.id, file)
-                : undefined
-            }
-          />
+          {activeTab !== "tree" && (
+            <PersonDetails
+              person={selectedPerson}
+              persons={clanPersons}
+              relationships={clanRelationships}
+              canEdit={selectedPerson ? canEditPerson(selectedPerson) : false}
+              onSubmitUpdate={handleSubmitUpdate}
+              onAddParentChild={(parentId, childId) =>
+                createParentChildRelationship(parentId, childId)
+              }
+              onAddPartner={(personId, partnerId, marriageDate) =>
+                createPartnerRelationship(personId, partnerId, marriageDate)
+              }
+              onUpdateRelationship={updateRelationship}
+              onDelete={deletePerson}
+              canUploadPhoto={Boolean(
+                selectedPerson && canEditPerson(selectedPerson) && isSupabaseEnabled && !isGuest
+              )}
+              onUploadPhoto={
+                selectedPerson
+                  ? (file) => uploadPersonPhoto(selectedPerson.id, file)
+                  : undefined
+              }
+            />
+          )}
         </div>
       </div>
       <AddChildDialog
