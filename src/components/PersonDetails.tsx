@@ -316,177 +316,182 @@ export const PersonDetails = ({
           )}
         </div>
       </div>
-      <div className="mt-4 flex items-center gap-4">
-        <div className="size-20 overflow-hidden rounded-2xl border border-slate-200 bg-slate-100">
-          {person.photoUrl ? (
-            <Image
-              src={person.photoUrl}
-              alt={person.fullName}
-              width={80}
-              height={80}
-              className="size-full object-cover"
-              unoptimized
-            />
-          ) : (
-            <div className="flex size-full items-center justify-center text-xs font-semibold text-slate-400">
-              No photo
-            </div>
-          )}
-        </div>
-        <div>
-          <button
-            className={`inline-flex items-center gap-2 rounded-full px-4 py-2 text-xs font-semibold ${
-              canUploadPhoto ? "bg-amber-500 text-white" : "bg-slate-200 text-slate-500"
-            }`}
-            onClick={() => canUploadPhoto && photoInputRef.current?.click()}
-          >
-            <Camera size={14} />
-            Upload photo
-          </button>
-          {photoMessage && <p className="mt-2 text-xs text-slate-500">{photoMessage}</p>}
-          {!canUploadPhoto && (
-            <p className="mt-2 text-xs text-slate-500">
-              Sign in with branch access to upload photos.
-            </p>
-          )}
-          <input
-            ref={photoInputRef}
-            type="file"
-            accept="image/*"
-            className="hidden"
-            onChange={handlePhotoUpload}
-          />
-        </div>
-      </div>
-      <div className="mt-4 space-y-3 text-sm text-slate-600">
-        <p>
-          <span className="font-semibold text-slate-700">Birthday:</span>{" "}
-          {formatDate(person.birthDate)}
-        </p>
-        {!person.isAlive && (
-          <p>
-            <span className="font-semibold text-slate-700">Deceased:</span>{" "}
-            {formatDate(person.deathDate)}
-          </p>
-        )}
-        <p>
-          <span className="font-semibold text-slate-700">Gender:</span>{" "}
-          {person.gender ?? "Unknown"}
-        </p>
-        <p>
-          <span className="font-semibold text-slate-700">Location:</span>{" "}
-          {person.stats?.location ?? "Unknown"}
-        </p>
-        <p>
-          <span className="font-semibold text-slate-700">Occupation:</span>{" "}
-          {person.stats?.occupation ?? "Unknown"}
-        </p>
-        <p>
-          <span className="font-semibold text-slate-700">Notes:</span>{" "}
-          {person.notes ?? "No notes yet."}
-        </p>
-      </div>
-
-      <div className="mt-6 rounded-2xl border border-slate-200 bg-white p-4">
-        <p className="text-xs font-semibold uppercase tracking-[0.2em] text-slate-500">
-          Relationships
-        </p>
-        <div className="mt-3 space-y-3 text-sm text-slate-700">
-          <div>
-            <span className="text-xs font-semibold text-slate-500">Partners</span>
-            <div className="mt-1">
-              {relationshipSummary.partners.length > 0 ? (
-                <ul className="space-y-2 text-sm">
-                  {relationshipSummary.partners.map((entry) => {
-                    const dateValue =
-                      partnerDateDrafts[entry.relationship.id] ??
-                      entry.relationship.marriageDate ??
-                      "";
-                    return (
-                      <li key={entry.relationship.id} className="text-slate-700">
-                        <div className="flex items-center justify-between gap-3">
-                          <span className="font-semibold text-slate-800">
-                            {entry.person.fullName}
-                          </span>
-                          <span className="text-xs text-slate-500">
-                            {entry.relationship.marriageDate
-                              ? `Married ${formatDate(entry.relationship.marriageDate)}`
-                              : "Marriage date unknown"}
-                          </span>
-                        </div>
-                        {canEdit && (
-                          <div className="mt-2 flex flex-wrap gap-2">
-                            <input
-                              type="date"
-                              className="rounded-xl border border-slate-200 px-3 py-2 text-xs"
-                              value={dateValue}
-                              onChange={(event) =>
-                                setPartnerDateDrafts((prev) => ({
-                                  ...prev,
-                                  [entry.relationship.id]: event.target.value,
-                                }))
-                              }
-                            />
-                            <button
-                              className="rounded-xl bg-slate-900 px-3 py-2 text-xs font-semibold text-white disabled:opacity-40"
-                              onClick={() =>
-                                onUpdateRelationship(entry.relationship.id, {
-                                  marriageDate: dateValue || null,
-                                })
-                              }
-                              disabled={
-                                dateValue === (entry.relationship.marriageDate ?? "")
-                              }
-                              type="button"
-                            >
-                              Save
-                            </button>
-                          </div>
-                        )}
-                      </li>
-                    );
-                  })}
-                </ul>
+      <div className="mt-4 grid gap-6 lg:grid-cols-[1.1fr_1fr]">
+        <div className="space-y-4">
+          <div className="flex items-center gap-4">
+            <div className="size-20 overflow-hidden rounded-2xl border border-slate-200 bg-slate-100">
+              {person.photoUrl ? (
+                <Image
+                  src={person.photoUrl}
+                  alt={person.fullName}
+                  width={80}
+                  height={80}
+                  className="size-full object-cover"
+                  unoptimized
+                />
               ) : (
-                <p className="text-sm text-slate-500">No partners linked yet.</p>
+                <div className="flex size-full items-center justify-center text-xs font-semibold text-slate-400">
+                  No photo
+                </div>
               )}
             </div>
-            {canEdit && (
-              <div className="mt-2 grid gap-2">
-                <div className="flex gap-2">
-                  <select
-                    className="w-full rounded-xl border border-slate-200 px-3 py-2 text-sm"
-                    value={selectedPartnerId}
-                    onChange={(event) => setSelectedPartnerId(event.target.value)}
-                  >
-                    <option value="">Add partner</option>
-                    {relationshipSummary.eligiblePartners.map((candidate) => (
-                      <option key={candidate.id} value={candidate.id}>
-                        {candidate.fullName}
-                      </option>
-                    ))}
-                  </select>
-                  <button
-                    className="rounded-xl bg-slate-900 px-3 py-2 text-xs font-semibold text-white disabled:opacity-40"
-                    onClick={addPartner}
-                    disabled={!selectedPartnerId}
-                    type="button"
-                  >
-                    Link
-                  </button>
-                </div>
-                <input
-                  type="date"
-                  className="w-full rounded-xl border border-slate-200 px-3 py-2 text-sm"
-                  placeholder="Marriage date (optional)"
-                  value={selectedPartnerMarriageDate}
-                  aria-label="Marriage date (optional)"
-                  title="Marriage date (optional)"
-                  onChange={(event) => setSelectedPartnerMarriageDate(event.target.value)}
-                />
-              </div>
-            )}
+            <div>
+              <button
+                className={`inline-flex items-center gap-2 rounded-full px-4 py-2 text-xs font-semibold ${
+                  canUploadPhoto
+                    ? "bg-amber-500 text-white"
+                    : "bg-slate-200 text-slate-500"
+                }`}
+                onClick={() => canUploadPhoto && photoInputRef.current?.click()}
+              >
+                <Camera size={14} />
+                Upload photo
+              </button>
+              {photoMessage && <p className="mt-2 text-xs text-slate-500">{photoMessage}</p>}
+              {!canUploadPhoto && (
+                <p className="mt-2 text-xs text-slate-500">
+                  Sign in with branch access to upload photos.
+                </p>
+              )}
+              <input
+                ref={photoInputRef}
+                type="file"
+                accept="image/*"
+                className="hidden"
+                onChange={handlePhotoUpload}
+              />
+            </div>
           </div>
+          <div className="grid gap-3 text-sm text-slate-600 sm:grid-cols-2">
+            <p>
+              <span className="font-semibold text-slate-700">Birthday:</span>{" "}
+              {formatDate(person.birthDate)}
+            </p>
+            {!person.isAlive && (
+              <p>
+                <span className="font-semibold text-slate-700">Deceased:</span>{" "}
+                {formatDate(person.deathDate)}
+              </p>
+            )}
+            <p>
+              <span className="font-semibold text-slate-700">Gender:</span>{" "}
+              {person.gender ?? "Unknown"}
+            </p>
+            <p>
+              <span className="font-semibold text-slate-700">Location:</span>{" "}
+              {person.stats?.location ?? "Unknown"}
+            </p>
+            <p>
+              <span className="font-semibold text-slate-700">Occupation:</span>{" "}
+              {person.stats?.occupation ?? "Unknown"}
+            </p>
+            <p className="sm:col-span-2">
+              <span className="font-semibold text-slate-700">Notes:</span>{" "}
+              {person.notes ?? "No notes yet."}
+            </p>
+          </div>
+        </div>
+
+        <div className="rounded-2xl border border-slate-200 bg-white p-4">
+          <p className="text-xs font-semibold uppercase tracking-[0.2em] text-slate-500">
+            Relationships
+          </p>
+          <div className="mt-3 space-y-3 text-sm text-slate-700">
+            <div>
+              <span className="text-xs font-semibold text-slate-500">Partners</span>
+              <div className="mt-1">
+                {relationshipSummary.partners.length > 0 ? (
+                  <ul className="space-y-2 text-sm">
+                    {relationshipSummary.partners.map((entry) => {
+                      const dateValue =
+                        partnerDateDrafts[entry.relationship.id] ??
+                        entry.relationship.marriageDate ??
+                        "";
+                      return (
+                        <li key={entry.relationship.id} className="text-slate-700">
+                          <div className="flex items-center justify-between gap-3">
+                            <span className="font-semibold text-slate-800">
+                              {entry.person.fullName}
+                            </span>
+                            <span className="text-xs text-slate-500">
+                              {entry.relationship.marriageDate
+                                ? `Married ${formatDate(entry.relationship.marriageDate)}`
+                                : "Marriage date unknown"}
+                            </span>
+                          </div>
+                          {canEdit && (
+                            <div className="mt-2 flex flex-wrap gap-2">
+                              <input
+                                type="date"
+                                className="rounded-xl border border-slate-200 px-3 py-2 text-xs"
+                                value={dateValue}
+                                onChange={(event) =>
+                                  setPartnerDateDrafts((prev) => ({
+                                    ...prev,
+                                    [entry.relationship.id]: event.target.value,
+                                  }))
+                                }
+                              />
+                              <button
+                                className="rounded-xl bg-slate-900 px-3 py-2 text-xs font-semibold text-white disabled:opacity-40"
+                                onClick={() =>
+                                  onUpdateRelationship(entry.relationship.id, {
+                                    marriageDate: dateValue || null,
+                                  })
+                                }
+                                disabled={
+                                  dateValue === (entry.relationship.marriageDate ?? "")
+                                }
+                                type="button"
+                              >
+                                Save
+                              </button>
+                            </div>
+                          )}
+                        </li>
+                      );
+                    })}
+                  </ul>
+                ) : (
+                  <p className="text-sm text-slate-500">No partners linked yet.</p>
+                )}
+              </div>
+              {canEdit && (
+                <div className="mt-2 grid gap-2">
+                  <div className="flex gap-2">
+                    <select
+                      className="w-full rounded-xl border border-slate-200 px-3 py-2 text-sm"
+                      value={selectedPartnerId}
+                      onChange={(event) => setSelectedPartnerId(event.target.value)}
+                    >
+                      <option value="">Add partner</option>
+                      {relationshipSummary.eligiblePartners.map((candidate) => (
+                        <option key={candidate.id} value={candidate.id}>
+                          {candidate.fullName}
+                        </option>
+                      ))}
+                    </select>
+                    <button
+                      className="rounded-xl bg-slate-900 px-3 py-2 text-xs font-semibold text-white disabled:opacity-40"
+                      onClick={addPartner}
+                      disabled={!selectedPartnerId}
+                      type="button"
+                    >
+                      Link
+                    </button>
+                  </div>
+                  <input
+                    type="date"
+                    className="w-full rounded-xl border border-slate-200 px-3 py-2 text-sm"
+                    placeholder="Marriage date (optional)"
+                    value={selectedPartnerMarriageDate}
+                    aria-label="Marriage date (optional)"
+                    title="Marriage date (optional)"
+                    onChange={(event) => setSelectedPartnerMarriageDate(event.target.value)}
+                  />
+                </div>
+              )}
+            </div>
 
           <div>
             <span className="text-xs font-semibold text-slate-500">Parents</span>

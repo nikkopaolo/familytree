@@ -425,7 +425,7 @@ export const TreeCanvas = ({
 
   if (!hasPeople) {
     return (
-      <section className="glass-card flex min-h-[560px] h-[calc(100vh-320px)] flex-col gap-4 rounded-3xl p-6">
+      <section className="glass-card flex min-h-[620px] h-[calc(100vh-260px)] flex-col gap-4 rounded-3xl p-6">
         <div className="flex items-center justify-between">
           <div>
             <p className="text-xs font-semibold uppercase tracking-[0.2em] text-slate-500">Tree</p>
@@ -450,7 +450,7 @@ export const TreeCanvas = ({
 
   const containerClass = isFullscreen
     ? "glass-card fixed inset-4 z-50 flex h-[calc(100vh-2rem)] flex-col gap-3 rounded-3xl p-4"
-    : "glass-card flex min-h-[560px] h-[calc(100vh-320px)] flex-col gap-3 rounded-3xl p-4";
+    : "glass-card flex min-h-[620px] h-[calc(100vh-260px)] flex-col gap-3 rounded-3xl p-4";
 
   return (
     <section className={containerClass}>

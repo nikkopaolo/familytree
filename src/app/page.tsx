@@ -124,28 +124,68 @@ export default function Home() {
   };
 
   const quickStats = useMemo(() => {
+    const totalMembers = clanPersons.length;
     const aliveCount = clanPersons.filter((person) => person.isAlive).length;
-    const { totalAge, count } = clanPersons.reduce(
-      (acc, person) => {
-        const ageValue = Number(calculateAge(person.birthDate, person.deathDate));
-        if (Number.isFinite(ageValue)) {
-          acc.totalAge += ageValue;
-          acc.count += 1;
-        }
-        return acc;
-      },
-      { totalAge: 0, count: 0 }
-    );
-    const avgAge = count > 0 ? totalAge / count : 0;
+    const deceasedCount = totalMembers - aliveCount;
+    const aliveRate = totalMembers > 0 ? Math.round((aliveCount / totalMembers) * 100) : 0;
+    const ages = clanPersons
+      .map((person) => Number(calculateAge(person.birthDate, person.deathDate)))
+      .filter((value) => Number.isFinite(value))
+      .sort((a, b) => a - b);
+    const avgAge =
+      ages.length > 0 ? ages.reduce((sum, value) => sum + value, 0) / ages.length : 0;
+    const medianAge =
+      ages.length === 0
+        ? null
+        : ages.length % 2 === 1
+          ? ages[Math.floor(ages.length / 2)]
+          : (ages[ages.length / 2 - 1] + ages[ages.length / 2]) / 2;
+    const partnerLinks = clanRelationships.filter(
+      (rel) => rel.relationshipType === "partner"
+    ).length;
+    const birthdaysKnown = clanPersons.filter((person) => person.birthDate).length;
+    const birthdayRate =
+      totalMembers > 0 ? Math.round((birthdaysKnown / totalMembers) * 100) : 0;
+    const photosCount = clanPersons.filter((person) => person.photoUrl).length;
+    const photoRate =
+      totalMembers > 0 ? Math.round((photosCount / totalMembers) * 100) : 0;
+
     return [
-      { label: "Total Members", value: clanPersons.length },
-      { label: "Alive", value: aliveCount },
-      { label: "Avg. Age", value: Math.round(avgAge) || "N/A" },
+      {
+        label: "Total Members",
+        value: totalMembers,
+        sub: `${aliveCount} alive • ${deceasedCount} deceased`,
+      },
+      {
+        label: "Alive Rate",
+        value: `${aliveRate}%`,
+        sub: "Share of living members",
+      },
+      {
+        label: "Avg. Age",
+        value: Math.round(avgAge) || "N/A",
+        sub: medianAge ? `Median ${Math.round(medianAge)}` : "Median N/A",
+      },
+      {
+        label: "Linked Couples",
+        value: partnerLinks,
+        sub: "Partner relationships",
+      },
+      {
+        label: "Birthdays Known",
+        value: birthdaysKnown,
+        sub: `${birthdayRate}% recorded`,
+      },
+      {
+        label: "Photos",
+        value: photosCount,
+        sub: `${photoRate}% with photos`,
+      },
     ];
-  }, [clanPersons]);
+  }, [clanPersons, clanRelationships]);
 
   return (
-    <main className="pb-12">
+    <main className="pb-12 px-4">
       <TopBar
         clans={clans}
         role={membership?.role}
@@ -165,18 +205,22 @@ export default function Home() {
         }}
       />
       <TabNav activeTab={activeTab} onChange={setActiveTab} showSuggestions={false} />
-      <div className="mx-auto mt-4 grid w-[calc(100%-32px)] max-w-none grid-cols-1 gap-5 xl:grid-cols-[minmax(0,1fr)_360px]">
+      <div className="mx-auto mt-4 grid w-full max-w-none grid-cols-1 gap-5 xl:grid-cols-[minmax(0,1fr)_420px]">
         <section className="flex flex-col gap-6">
-          <div className="glass-card rounded-3xl px-5 py-3">
-            <div className="grid divide-y divide-slate-200 sm:grid-cols-3 sm:divide-y-0 sm:divide-x">
+          <div className="glass-card rounded-3xl px-4 py-4">
+            <div className="grid gap-3 sm:grid-cols-3 xl:grid-cols-6">
               {quickStats.map((stat) => (
-                <div key={stat.label} className="py-2 sm:px-5">
+                <div
+                  key={stat.label}
+                  className="rounded-2xl border border-slate-200/70 bg-white/70 px-3 py-3"
+                >
                   <p className="text-[10px] font-semibold uppercase tracking-[0.25em] text-slate-500">
                     {stat.label}
                   </p>
-                  <p className="mt-1 text-2xl font-semibold text-slate-900">
+                  <p className="mt-1 text-xl font-semibold text-slate-900">
                     {stat.value}
                   </p>
+                  <p className="mt-1 text-[11px] text-slate-500">{stat.sub}</p>
                 </div>
               ))}
             </div>
@@ -224,31 +268,29 @@ export default function Home() {
                 isMaxNodesUnlimited={unlimitedNodes}
                 onToggleMaxNodesUnlimited={setUnlimitedNodes}
               />
-              <div className="mx-auto w-full max-w-5xl">
-                <PersonDetails
-                  person={selectedPerson}
-                  persons={clanPersons}
-                  relationships={clanRelationships}
-                  canEdit={selectedPerson ? canEditPerson(selectedPerson) : false}
-                  onSubmitUpdate={handleSubmitUpdate}
-                  onAddParentChild={(parentId, childId) =>
-                    createParentChildRelationship(parentId, childId)
-                  }
-                  onAddPartner={(personId, partnerId, marriageDate) =>
-                    createPartnerRelationship(personId, partnerId, marriageDate)
-                  }
-                  onUpdateRelationship={updateRelationship}
-                  onDelete={deletePerson}
-                  canUploadPhoto={Boolean(
-                    selectedPerson && canEditPerson(selectedPerson) && isSupabaseEnabled && !isGuest
-                  )}
-                  onUploadPhoto={
-                    selectedPerson
-                      ? (file) => uploadPersonPhoto(selectedPerson.id, file)
-                      : undefined
-                  }
-                />
-              </div>
+              <PersonDetails
+                person={selectedPerson}
+                persons={clanPersons}
+                relationships={clanRelationships}
+                canEdit={selectedPerson ? canEditPerson(selectedPerson) : false}
+                onSubmitUpdate={handleSubmitUpdate}
+                onAddParentChild={(parentId, childId) =>
+                  createParentChildRelationship(parentId, childId)
+                }
+                onAddPartner={(personId, partnerId, marriageDate) =>
+                  createPartnerRelationship(personId, partnerId, marriageDate)
+                }
+                onUpdateRelationship={updateRelationship}
+                onDelete={deletePerson}
+                canUploadPhoto={Boolean(
+                  selectedPerson && canEditPerson(selectedPerson) && isSupabaseEnabled && !isGuest
+                )}
+                onUploadPhoto={
+                  selectedPerson
+                    ? (file) => uploadPersonPhoto(selectedPerson.id, file)
+                    : undefined
+                }
+              />
             </>
           )}
           {activeTab === "list" && (
