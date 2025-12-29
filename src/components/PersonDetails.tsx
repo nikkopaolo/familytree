@@ -2,7 +2,7 @@
 
 import Image from "next/image";
 import { useEffect, useMemo, useRef, useState } from "react";
-import { Camera, Edit3, Send } from "lucide-react";
+import { Camera, Send } from "lucide-react";
 import type { Person, Relationship } from "@/lib/types";
 import { calculateAge, formatDate } from "@/lib/utils";
 
@@ -19,6 +19,7 @@ type PersonDetailsProps = {
     marriageDate?: string | null
   ) => void;
   onUpdateRelationship: (relationshipId: string, payload: Record<string, unknown>) => void;
+  onDeleteRelationship?: (relationshipId: string) => void;
   onDelete?: (personId: string) => void;
   canUploadPhoto?: boolean;
   onUploadPhoto?: (file: File) => Promise<{ error?: string }>;
@@ -33,11 +34,11 @@ export const PersonDetails = ({
   onAddParentChild,
   onAddPartner,
   onUpdateRelationship,
+  onDeleteRelationship,
   onDelete,
   canUploadPhoto = false,
   onUploadPhoto,
 }: PersonDetailsProps) => {
-  const [openForm, setOpenForm] = useState(false);
   const [photoMessage, setPhotoMessage] = useState("");
   const [selectedParentId, setSelectedParentId] = useState("");
   const [selectedChildId, setSelectedChildId] = useState("");
@@ -49,6 +50,7 @@ export const PersonDetails = ({
     isAlive: true,
     notes: "",
     location: "",
+    occupation: "",
     birthDate: "",
     deathDate: "",
     gender: "",
@@ -62,8 +64,8 @@ export const PersonDetails = ({
     const isPerson = (value: Person | undefined): value is Person => Boolean(value);
     if (!personId) {
       return {
-        parents: [] as Person[],
-        children: [] as Person[],
+        parents: [] as Array<{ person: Person; relationship: Relationship }>,
+        children: [] as Array<{ person: Person; relationship: Relationship }>,
         partners: [] as Array<{ person: Person; relationship: Relationship }>,
         siblings: [] as Person[],
         auntsUncles: [] as Person[],
@@ -87,13 +89,25 @@ export const PersonDetails = ({
     );
 
     const parents = parentLinks
-      .map((rel) => persons.find((p) => p.id === rel.parentId))
-      .filter(isPerson)
-      .sort(sortByName);
+      .map((rel) => {
+        const parent = persons.find((p) => p.id === rel.parentId);
+        if (!parent) return null;
+        return { person: parent, relationship: rel };
+      })
+      .filter(
+        (value): value is { person: Person; relationship: Relationship } => Boolean(value)
+      )
+      .sort((a, b) => sortByName(a.person, b.person));
     const children = childLinks
-      .map((rel) => persons.find((p) => p.id === rel.childId))
-      .filter(isPerson)
-      .sort(sortByName);
+      .map((rel) => {
+        const child = persons.find((p) => p.id === rel.childId);
+        if (!child) return null;
+        return { person: child, relationship: rel };
+      })
+      .filter(
+        (value): value is { person: Person; relationship: Relationship } => Boolean(value)
+      )
+      .sort((a, b) => sortByName(a.person, b.person));
     const partners = partnerLinks
       .map((rel) => {
         const partner = persons.find(
@@ -195,6 +209,7 @@ export const PersonDetails = ({
       isAlive: person.isAlive,
       notes: person.notes ?? "",
       location: person.stats?.location ?? "",
+      occupation: person.stats?.occupation ?? "",
       birthDate: person.birthDate ?? "",
       deathDate: person.deathDate ?? "",
       gender: person.gender ?? "",
@@ -241,10 +256,24 @@ export const PersonDetails = ({
       stats: {
         ...(person.stats ?? {}),
         location: formState.location,
+        occupation: formState.occupation,
       },
     };
     onSubmitUpdate(payload);
-    setOpenForm(false);
+  };
+
+  const handleReset = () => {
+    if (!person) return;
+    setFormState({
+      fullName: person.fullName,
+      isAlive: person.isAlive,
+      notes: person.notes ?? "",
+      location: person.stats?.location ?? "",
+      occupation: person.stats?.occupation ?? "",
+      birthDate: person.birthDate ?? "",
+      deathDate: person.deathDate ?? "",
+      gender: person.gender ?? "",
+    });
   };
 
   const handlePhotoUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
@@ -279,25 +308,59 @@ export const PersonDetails = ({
     setSelectedPartnerMarriageDate("");
   };
 
+  const isDirty = Boolean(
+    person &&
+      (formState.fullName !== person.fullName ||
+        formState.birthDate !== (person.birthDate ?? "") ||
+        formState.isAlive !== person.isAlive ||
+        (formState.isAlive ? "" : formState.deathDate) !== (person.deathDate ?? "") ||
+        formState.gender !== (person.gender ?? "") ||
+        formState.location !== (person.stats?.location ?? "") ||
+        formState.occupation !== (person.stats?.occupation ?? "") ||
+        formState.notes !== (person.notes ?? ""))
+  );
+
   return (
     <aside className="glass-card rounded-3xl p-6">
       <div className="flex items-start justify-between gap-3">
-        <div>
-          <h3 className="text-xl text-slate-900">{person.fullName}</h3>
-          <p className="text-sm text-slate-500">
-            {person.isAlive ? "Alive" : "Deceased"} - Age{" "}
+        <div className="flex-1">
+          {canEdit ? (
+            <input
+              className="w-full rounded-xl border border-slate-200 px-3 py-2 text-xl font-semibold text-slate-900"
+              value={formState.fullName}
+              onChange={(event) =>
+                setFormState((prev) => ({ ...prev, fullName: event.target.value }))
+              }
+            />
+          ) : (
+            <h3 className="text-xl text-slate-900">{person.fullName}</h3>
+          )}
+          <p className="mt-1 text-sm text-slate-500">
+            {formState.isAlive ? "Alive" : "Deceased"} - Age{" "}
             {calculateAge(person.birthDate, person.deathDate)}
           </p>
         </div>
         <div className="flex flex-wrap items-center gap-2">
           {canEdit && (
-            <button
-              className="inline-flex items-center gap-2 rounded-full border border-slate-200 bg-white px-3 py-2 text-xs font-semibold text-slate-600"
-              onClick={() => setOpenForm((prev) => !prev)}
-            >
-              <Edit3 size={14} />
-              Update
-            </button>
+            <>
+              <button
+                className="inline-flex items-center gap-2 rounded-full border border-slate-200 bg-white px-3 py-2 text-xs font-semibold text-slate-600 disabled:opacity-40"
+                onClick={handleReset}
+                disabled={!isDirty}
+                type="button"
+              >
+                Reset
+              </button>
+              <button
+                className="inline-flex items-center gap-2 rounded-full bg-amber-500 px-3 py-2 text-xs font-semibold text-white disabled:opacity-40"
+                onClick={handleSubmit}
+                disabled={!isDirty}
+                type="button"
+              >
+                <Send size={14} />
+                Save
+              </button>
+            </>
           )}
           {canEdit && onDelete && (
             <button
@@ -310,6 +373,7 @@ export const PersonDetails = ({
                   onDelete(person.id);
                 }
               }}
+              type="button"
             >
               Delete
             </button>
@@ -363,32 +427,133 @@ export const PersonDetails = ({
             </div>
           </div>
           <div className="grid gap-3 text-sm text-slate-600 sm:grid-cols-2">
-            <p>
-              <span className="font-semibold text-slate-700">Birthday:</span>{" "}
-              {formatDate(person.birthDate)}
-            </p>
-            {!person.isAlive && (
-              <p>
-                <span className="font-semibold text-slate-700">Deceased:</span>{" "}
-                {formatDate(person.deathDate)}
-              </p>
+            <label className="block">
+              <span className="text-xs font-semibold text-slate-500">Birthday</span>
+              {canEdit ? (
+                <input
+                  type="date"
+                  className="mt-1 w-full rounded-xl border border-slate-200 px-3 py-2"
+                  value={formState.birthDate}
+                  onChange={(event) =>
+                    setFormState((prev) => ({ ...prev, birthDate: event.target.value }))
+                  }
+                />
+              ) : (
+                <p className="mt-1 text-sm text-slate-700">
+                  {formatDate(person.birthDate)}
+                </p>
+              )}
+            </label>
+            {!formState.isAlive && (
+              <label className="block">
+                <span className="text-xs font-semibold text-slate-500">Deceased date</span>
+                {canEdit ? (
+                  <input
+                    type="date"
+                    className="mt-1 w-full rounded-xl border border-slate-200 px-3 py-2"
+                    value={formState.deathDate}
+                    onChange={(event) =>
+                      setFormState((prev) => ({ ...prev, deathDate: event.target.value }))
+                    }
+                  />
+                ) : (
+                  <p className="mt-1 text-sm text-slate-700">
+                    {formatDate(person.deathDate)}
+                  </p>
+                )}
+              </label>
             )}
-            <p>
-              <span className="font-semibold text-slate-700">Gender:</span>{" "}
-              {person.gender ?? "Unknown"}
-            </p>
-            <p>
-              <span className="font-semibold text-slate-700">Location:</span>{" "}
-              {person.stats?.location ?? "Unknown"}
-            </p>
-            <p>
-              <span className="font-semibold text-slate-700">Occupation:</span>{" "}
-              {person.stats?.occupation ?? "Unknown"}
-            </p>
-            <p className="sm:col-span-2">
-              <span className="font-semibold text-slate-700">Notes:</span>{" "}
-              {person.notes ?? "No notes yet."}
-            </p>
+            <label className="block">
+              <span className="text-xs font-semibold text-slate-500">Status</span>
+              {canEdit ? (
+                <select
+                  className="mt-1 w-full rounded-xl border border-slate-200 px-3 py-2"
+                  value={formState.isAlive ? "alive" : "deceased"}
+                  onChange={(event) =>
+                    setFormState((prev) => ({
+                      ...prev,
+                      isAlive: event.target.value === "alive",
+                      deathDate: event.target.value === "alive" ? "" : prev.deathDate,
+                    }))
+                  }
+                >
+                  <option value="alive">Alive</option>
+                  <option value="deceased">Deceased</option>
+                </select>
+              ) : (
+                <p className="mt-1 text-sm text-slate-700">
+                  {person.isAlive ? "Alive" : "Deceased"}
+                </p>
+              )}
+            </label>
+            <label className="block">
+              <span className="text-xs font-semibold text-slate-500">Gender</span>
+              {canEdit ? (
+                <select
+                  className="mt-1 w-full rounded-xl border border-slate-200 px-3 py-2"
+                  value={formState.gender}
+                  onChange={(event) =>
+                    setFormState((prev) => ({ ...prev, gender: event.target.value }))
+                  }
+                >
+                  <option value="">Unspecified</option>
+                  <option value="Female">Female</option>
+                  <option value="Male">Male</option>
+                </select>
+              ) : (
+                <p className="mt-1 text-sm text-slate-700">
+                  {person.gender ?? "Unknown"}
+                </p>
+              )}
+            </label>
+            <label className="block">
+              <span className="text-xs font-semibold text-slate-500">Location</span>
+              {canEdit ? (
+                <input
+                  className="mt-1 w-full rounded-xl border border-slate-200 px-3 py-2"
+                  value={formState.location}
+                  onChange={(event) =>
+                    setFormState((prev) => ({ ...prev, location: event.target.value }))
+                  }
+                />
+              ) : (
+                <p className="mt-1 text-sm text-slate-700">
+                  {person.stats?.location ?? "Unknown"}
+                </p>
+              )}
+            </label>
+            <label className="block">
+              <span className="text-xs font-semibold text-slate-500">Occupation</span>
+              {canEdit ? (
+                <input
+                  className="mt-1 w-full rounded-xl border border-slate-200 px-3 py-2"
+                  value={formState.occupation}
+                  onChange={(event) =>
+                    setFormState((prev) => ({ ...prev, occupation: event.target.value }))
+                  }
+                />
+              ) : (
+                <p className="mt-1 text-sm text-slate-700">
+                  {person.stats?.occupation ?? "Unknown"}
+                </p>
+              )}
+            </label>
+            <label className="block sm:col-span-2">
+              <span className="text-xs font-semibold text-slate-500">Notes</span>
+              {canEdit ? (
+                <textarea
+                  className="mt-1 min-h-[100px] w-full rounded-xl border border-slate-200 px-3 py-2"
+                  value={formState.notes}
+                  onChange={(event) =>
+                    setFormState((prev) => ({ ...prev, notes: event.target.value }))
+                  }
+                />
+              ) : (
+                <p className="mt-1 text-sm text-slate-700">
+                  {person.notes ?? "No notes yet."}
+                </p>
+              )}
+            </label>
           </div>
         </div>
 
@@ -446,6 +611,22 @@ export const PersonDetails = ({
                               >
                                 Save
                               </button>
+                              {onDeleteRelationship && (
+                                <button
+                                  className="rounded-xl border border-rose-200 bg-rose-50 px-3 py-2 text-xs font-semibold text-rose-700"
+                                  onClick={() => {
+                                    const confirmed = window.confirm(
+                                      `Remove ${entry.person.fullName} as partner?`
+                                    );
+                                    if (confirmed) {
+                                      onDeleteRelationship(entry.relationship.id);
+                                    }
+                                  }}
+                                  type="button"
+                                >
+                                  Remove
+                                </button>
+                              )}
                             </div>
                           )}
                         </li>
@@ -498,9 +679,27 @@ export const PersonDetails = ({
               <div className="mt-1">
                 {relationshipSummary.parents.length > 0 ? (
                   <ul className="space-y-1 text-sm">
-                    {relationshipSummary.parents.map((parent) => (
-                      <li key={parent.id} className="text-slate-700">
-                        {parent.fullName}
+                    {relationshipSummary.parents.map((entry) => (
+                      <li key={entry.relationship.id} className="text-slate-700">
+                        <div className="flex items-center justify-between gap-3">
+                          <span>{entry.person.fullName}</span>
+                          {canEdit && onDeleteRelationship && (
+                            <button
+                              className="rounded-full border border-rose-200 bg-rose-50 px-2 py-1 text-[10px] font-semibold text-rose-700"
+                              onClick={() => {
+                                const confirmed = window.confirm(
+                                  `Remove ${entry.person.fullName} as parent?`
+                                );
+                                if (confirmed) {
+                                  onDeleteRelationship(entry.relationship.id);
+                                }
+                              }}
+                              type="button"
+                            >
+                              Remove
+                            </button>
+                          )}
+                        </div>
                       </li>
                     ))}
                   </ul>
@@ -539,9 +738,27 @@ export const PersonDetails = ({
               <div className="mt-1">
                 {relationshipSummary.children.length > 0 ? (
                   <ul className="space-y-1 text-sm">
-                    {relationshipSummary.children.map((child) => (
-                      <li key={child.id} className="text-slate-700">
-                        {child.fullName}
+                    {relationshipSummary.children.map((entry) => (
+                      <li key={entry.relationship.id} className="text-slate-700">
+                        <div className="flex items-center justify-between gap-3">
+                          <span>{entry.person.fullName}</span>
+                          {canEdit && onDeleteRelationship && (
+                            <button
+                              className="rounded-full border border-rose-200 bg-rose-50 px-2 py-1 text-[10px] font-semibold text-rose-700"
+                              onClick={() => {
+                                const confirmed = window.confirm(
+                                  `Remove ${entry.person.fullName} as child?`
+                                );
+                                if (confirmed) {
+                                  onDeleteRelationship(entry.relationship.id);
+                                }
+                              }}
+                              type="button"
+                            >
+                              Remove
+                            </button>
+                          )}
+                        </div>
                       </li>
                     ))}
                   </ul>
@@ -618,107 +835,6 @@ export const PersonDetails = ({
         </div>
       </div>
 
-      {openForm && canEdit && (
-        <div className="mt-6 rounded-2xl border border-slate-200 bg-white p-4">
-          <p className="text-xs font-semibold uppercase tracking-[0.2em] text-slate-500">
-            Direct Update
-          </p>
-          <div className="mt-3 space-y-3 text-sm">
-            <label className="block">
-              <span className="text-xs text-slate-500">Full name</span>
-              <input
-                className="mt-1 w-full rounded-xl border border-slate-200 px-3 py-2"
-                value={formState.fullName}
-                onChange={(event) =>
-                  setFormState((prev) => ({ ...prev, fullName: event.target.value }))
-                }
-              />
-            </label>
-            <label className="block">
-              <span className="text-xs text-slate-500">Birthday</span>
-              <input
-                type="date"
-                className="mt-1 w-full rounded-xl border border-slate-200 px-3 py-2"
-                value={formState.birthDate}
-                onChange={(event) =>
-                  setFormState((prev) => ({ ...prev, birthDate: event.target.value }))
-                }
-              />
-            </label>
-            {!formState.isAlive && (
-              <label className="block">
-                <span className="text-xs text-slate-500">Deceased date</span>
-                <input
-                  type="date"
-                  className="mt-1 w-full rounded-xl border border-slate-200 px-3 py-2"
-                  value={formState.deathDate}
-                  onChange={(event) =>
-                    setFormState((prev) => ({ ...prev, deathDate: event.target.value }))
-                  }
-                />
-              </label>
-            )}
-            <label className="block">
-              <span className="text-xs text-slate-500">Gender</span>
-              <select
-                className="mt-1 w-full rounded-xl border border-slate-200 px-3 py-2"
-                value={formState.gender}
-                onChange={(event) =>
-                  setFormState((prev) => ({ ...prev, gender: event.target.value }))
-                }
-              >
-                <option value="">Unspecified</option>
-                <option value="Female">Female</option>
-                <option value="Male">Male</option>
-              </select>
-            </label>
-            <label className="block">
-              <span className="text-xs text-slate-500">Location</span>
-              <input
-                className="mt-1 w-full rounded-xl border border-slate-200 px-3 py-2"
-                value={formState.location}
-                onChange={(event) =>
-                  setFormState((prev) => ({ ...prev, location: event.target.value }))
-                }
-              />
-            </label>
-            <label className="block">
-              <span className="text-xs text-slate-500">Status</span>
-              <select
-                className="mt-1 w-full rounded-xl border border-slate-200 px-3 py-2"
-                value={formState.isAlive ? "alive" : "deceased"}
-                onChange={(event) =>
-                  setFormState((prev) => ({
-                    ...prev,
-                    isAlive: event.target.value === "alive",
-                    deathDate: event.target.value === "alive" ? "" : prev.deathDate,
-                  }))
-                }
-              >
-                <option value="alive">Alive</option>
-                <option value="deceased">Deceased</option>
-              </select>
-            </label>
-            <label className="block">
-              <span className="text-xs text-slate-500">Notes</span>
-              <textarea
-                className="mt-1 min-h-[80px] w-full rounded-xl border border-slate-200 px-3 py-2"
-                value={formState.notes}
-                onChange={(event) =>
-                  setFormState((prev) => ({ ...prev, notes: event.target.value }))
-                }
-              />
-            </label>
-            <button
-              className="inline-flex items-center gap-2 rounded-full bg-amber-500 px-4 py-2 text-xs font-semibold text-white"
-              onClick={handleSubmit}
-            >
-              <Send size={14} />
-              Save update
-            </button>
-          </div>
-        </div>
-      )}
     </aside>
   );
 };

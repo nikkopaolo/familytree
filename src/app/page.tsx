@@ -329,14 +329,15 @@ export default function Home() {
               onAddParentChild={(parentId, childId) =>
                 createParentChildRelationship(parentId, childId)
               }
-              onAddPartner={(personId, partnerId, marriageDate) =>
-                createPartnerRelationship(personId, partnerId, marriageDate)
-              }
-              onUpdateRelationship={updateRelationship}
-              onDelete={deletePerson}
-              canUploadPhoto={Boolean(
-                selectedPerson && canEditPerson(selectedPerson) && isSupabaseEnabled && !isGuest
-              )}
+                onAddPartner={(personId, partnerId, marriageDate) =>
+                  createPartnerRelationship(personId, partnerId, marriageDate)
+                }
+                onUpdateRelationship={updateRelationship}
+                onDeleteRelationship={deleteRelationship}
+                onDelete={deletePerson}
+                canUploadPhoto={Boolean(
+                  selectedPerson && canEditPerson(selectedPerson) && isSupabaseEnabled && !isGuest
+                )}
               onUploadPhoto={
                 selectedPerson
                   ? (file) => uploadPersonPhoto(selectedPerson.id, file)
@@ -357,14 +358,15 @@ export default function Home() {
             onAddParentChild={(parentId, childId) =>
               createParentChildRelationship(parentId, childId)
             }
-            onAddPartner={(personId, partnerId, marriageDate) =>
-              createPartnerRelationship(personId, partnerId, marriageDate)
-            }
-            onUpdateRelationship={updateRelationship}
-            onDelete={deletePerson}
-            canUploadPhoto={Boolean(
-              selectedPerson && canEditPerson(selectedPerson) && isSupabaseEnabled && !isGuest
-            )}
+              onAddPartner={(personId, partnerId, marriageDate) =>
+                createPartnerRelationship(personId, partnerId, marriageDate)
+              }
+              onUpdateRelationship={updateRelationship}
+              onDeleteRelationship={deleteRelationship}
+              onDelete={deletePerson}
+              canUploadPhoto={Boolean(
+                selectedPerson && canEditPerson(selectedPerson) && isSupabaseEnabled && !isGuest
+              )}
             onUploadPhoto={
               selectedPerson
                 ? (file) => uploadPersonPhoto(selectedPerson.id, file)
