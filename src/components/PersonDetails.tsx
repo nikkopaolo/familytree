@@ -493,119 +493,125 @@ export const PersonDetails = ({
               )}
             </div>
 
-          <div>
-            <span className="text-xs font-semibold text-slate-500">Parents</span>
-            <div className="mt-1">
-              {relationshipSummary.parents.length > 0 ? (
-                <ul className="space-y-1 text-sm">
-                  {relationshipSummary.parents.map((parent) => (
-                    <li key={parent.id} className="text-slate-700">
-                      {parent.fullName}
-                    </li>
-                  ))}
-                </ul>
-              ) : (
-                <p className="text-sm text-slate-500">No parents linked yet.</p>
+            <div>
+              <span className="text-xs font-semibold text-slate-500">Parents</span>
+              <div className="mt-1">
+                {relationshipSummary.parents.length > 0 ? (
+                  <ul className="space-y-1 text-sm">
+                    {relationshipSummary.parents.map((parent) => (
+                      <li key={parent.id} className="text-slate-700">
+                        {parent.fullName}
+                      </li>
+                    ))}
+                  </ul>
+                ) : (
+                  <p className="text-sm text-slate-500">No parents linked yet.</p>
+                )}
+              </div>
+              {canEdit && (
+                <div className="mt-2 flex gap-2">
+                  <select
+                    className="w-full rounded-xl border border-slate-200 px-3 py-2 text-sm"
+                    value={selectedParentId}
+                    onChange={(event) => setSelectedParentId(event.target.value)}
+                  >
+                    <option value="">Add parent</option>
+                    {relationshipSummary.eligibleParents.map((candidate) => (
+                      <option key={candidate.id} value={candidate.id}>
+                        {candidate.fullName}
+                      </option>
+                    ))}
+                  </select>
+                  <button
+                    className="rounded-xl bg-slate-900 px-3 py-2 text-xs font-semibold text-white disabled:opacity-40"
+                    onClick={addParent}
+                    disabled={!selectedParentId}
+                    type="button"
+                  >
+                    Link
+                  </button>
+                </div>
               )}
             </div>
-            {canEdit && (
-              <div className="mt-2 flex gap-2">
-                <select
-                  className="w-full rounded-xl border border-slate-200 px-3 py-2 text-sm"
-                  value={selectedParentId}
-                  onChange={(event) => setSelectedParentId(event.target.value)}
-                >
-                  <option value="">Add parent</option>
-                  {relationshipSummary.eligibleParents.map((candidate) => (
-                    <option key={candidate.id} value={candidate.id}>
-                      {candidate.fullName}
-                    </option>
-                  ))}
-                </select>
-                <button
-                  className="rounded-xl bg-slate-900 px-3 py-2 text-xs font-semibold text-white disabled:opacity-40"
-                  onClick={addParent}
-                  disabled={!selectedParentId}
-                  type="button"
-                >
-                  Link
-                </button>
-              </div>
-            )}
-          </div>
 
-          <div className="border-t border-slate-100 pt-3">
-            <span className="text-xs font-semibold text-slate-500">Children</span>
-            <div className="mt-1">
-              {relationshipSummary.children.length > 0 ? (
-                <ul className="space-y-1 text-sm">
-                  {relationshipSummary.children.map((child) => (
-                    <li key={child.id} className="text-slate-700">
-                      {child.fullName}
-                    </li>
-                  ))}
-                </ul>
-              ) : (
-                <p className="text-sm text-slate-500">No children linked yet.</p>
+            <div className="border-t border-slate-100 pt-3">
+              <span className="text-xs font-semibold text-slate-500">Children</span>
+              <div className="mt-1">
+                {relationshipSummary.children.length > 0 ? (
+                  <ul className="space-y-1 text-sm">
+                    {relationshipSummary.children.map((child) => (
+                      <li key={child.id} className="text-slate-700">
+                        {child.fullName}
+                      </li>
+                    ))}
+                  </ul>
+                ) : (
+                  <p className="text-sm text-slate-500">No children linked yet.</p>
+                )}
+              </div>
+              {canEdit && (
+                <div className="mt-2 flex gap-2">
+                  <select
+                    className="w-full rounded-xl border border-slate-200 px-3 py-2 text-sm"
+                    value={selectedChildId}
+                    onChange={(event) => setSelectedChildId(event.target.value)}
+                  >
+                    <option value="">Add child</option>
+                    {relationshipSummary.eligibleChildren.map((candidate) => (
+                      <option key={candidate.id} value={candidate.id}>
+                        {candidate.fullName}
+                      </option>
+                    ))}
+                  </select>
+                  <button
+                    className="rounded-xl bg-slate-900 px-3 py-2 text-xs font-semibold text-white disabled:opacity-40"
+                    onClick={addChild}
+                    disabled={!selectedChildId}
+                    type="button"
+                  >
+                    Link
+                  </button>
+                </div>
               )}
             </div>
-            {canEdit && (
-              <div className="mt-2 flex gap-2">
-                <select
-                  className="w-full rounded-xl border border-slate-200 px-3 py-2 text-sm"
-                  value={selectedChildId}
-                  onChange={(event) => setSelectedChildId(event.target.value)}
-                >
-                  <option value="">Add child</option>
-                  {relationshipSummary.eligibleChildren.map((candidate) => (
-                    <option key={candidate.id} value={candidate.id}>
-                      {candidate.fullName}
-                    </option>
-                  ))}
-                </select>
-                <button
-                  className="rounded-xl bg-slate-900 px-3 py-2 text-xs font-semibold text-white disabled:opacity-40"
-                  onClick={addChild}
-                  disabled={!selectedChildId}
-                  type="button"
-                >
-                  Link
-                </button>
-              </div>
-            )}
-          </div>
-          <div className="border-t border-slate-100 pt-3">
-            <span className="text-xs font-semibold text-slate-500">Derived</span>
-            <div className="mt-2 space-y-2 text-sm text-slate-600">
-              <div>
-                <span className="text-xs font-semibold text-slate-500">Siblings</span>
-                {relationshipSummary.siblings.length > 0 ? (
-                  <p className="mt-1 text-sm text-slate-700">
-                    {relationshipSummary.siblings.map((item) => item.fullName).join(", ")}
-                  </p>
-                ) : (
-                  <p className="mt-1 text-sm text-slate-500">No siblings detected.</p>
-                )}
-              </div>
-              <div>
-                <span className="text-xs font-semibold text-slate-500">Aunts / Uncles</span>
-                {relationshipSummary.auntsUncles.length > 0 ? (
-                  <p className="mt-1 text-sm text-slate-700">
-                    {relationshipSummary.auntsUncles.map((item) => item.fullName).join(", ")}
-                  </p>
-                ) : (
-                  <p className="mt-1 text-sm text-slate-500">No aunts or uncles detected.</p>
-                )}
-              </div>
-              <div>
-                <span className="text-xs font-semibold text-slate-500">Nieces / Nephews</span>
-                {relationshipSummary.niecesNephews.length > 0 ? (
-                  <p className="mt-1 text-sm text-slate-700">
-                    {relationshipSummary.niecesNephews.map((item) => item.fullName).join(", ")}
-                  </p>
-                ) : (
-                  <p className="mt-1 text-sm text-slate-500">No nieces or nephews detected.</p>
-                )}
+
+            <div className="border-t border-slate-100 pt-3">
+              <span className="text-xs font-semibold text-slate-500">Derived</span>
+              <div className="mt-2 space-y-2 text-sm text-slate-600">
+                <div>
+                  <span className="text-xs font-semibold text-slate-500">Siblings</span>
+                  {relationshipSummary.siblings.length > 0 ? (
+                    <p className="mt-1 text-sm text-slate-700">
+                      {relationshipSummary.siblings.map((item) => item.fullName).join(", ")}
+                    </p>
+                  ) : (
+                    <p className="mt-1 text-sm text-slate-500">No siblings detected.</p>
+                  )}
+                </div>
+                <div>
+                  <span className="text-xs font-semibold text-slate-500">Aunts / Uncles</span>
+                  {relationshipSummary.auntsUncles.length > 0 ? (
+                    <p className="mt-1 text-sm text-slate-700">
+                      {relationshipSummary.auntsUncles
+                        .map((item) => item.fullName)
+                        .join(", ")}
+                    </p>
+                  ) : (
+                    <p className="mt-1 text-sm text-slate-500">No aunts or uncles detected.</p>
+                  )}
+                </div>
+                <div>
+                  <span className="text-xs font-semibold text-slate-500">Nieces / Nephews</span>
+                  {relationshipSummary.niecesNephews.length > 0 ? (
+                    <p className="mt-1 text-sm text-slate-700">
+                      {relationshipSummary.niecesNephews
+                        .map((item) => item.fullName)
+                        .join(", ")}
+                    </p>
+                  ) : (
+                    <p className="mt-1 text-sm text-slate-500">No nieces or nephews detected.</p>
+                  )}
+                </div>
               </div>
             </div>
           </div>
