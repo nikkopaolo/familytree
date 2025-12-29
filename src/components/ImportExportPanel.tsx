@@ -32,7 +32,7 @@ export const ImportExportPanel = ({
   const fileInputRef = useRef<HTMLInputElement | null>(null);
 
   const handleExportCsv = () => {
-    const csv = exportPeopleCsv(persons);
+    const csv = exportPeopleCsv(persons, relationships);
     downloadFile(csv, "family-members.csv", "text/csv");
   };
 
@@ -91,8 +91,8 @@ export const ImportExportPanel = ({
     <section className="glass-card rounded-3xl p-6">
       <h3 className="text-xl text-slate-900">Import & Export</h3>
       <p className="text-sm text-slate-600">
-        Export CSV for member lists (relationships not included), JSON for a full tree backup,
-        or GEDCOM for genealogy tools. Import supports all three formats.
+        Export CSV for member lists with relationships, JSON for a full tree backup, or GEDCOM
+        for genealogy tools. Import supports all three formats.
       </p>
       <div className="mt-4 flex flex-wrap gap-3">
         <button

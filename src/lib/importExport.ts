@@ -1,14 +1,21 @@
 import type { Person, Relationship } from "./types";
 
 const csvHeaders = [
+  "id",
   "full_name",
   "birth_date",
   "death_date",
   "is_alive",
   "gender",
   "location",
+  "occupation",
   "photo_url",
   "notes",
+  "parents",
+  "children",
+  "partners",
+  "partner_marriages",
+  "siblings",
 ];
 
 const resolveLocation = (person: Person) =>
@@ -24,25 +31,97 @@ const resolveStats = (person: Person) => {
   };
 };
 
+const resolveOccupation = (person: Person) =>
+  person.stats?.occupation ?? (person as { occupation?: string }).occupation ?? "";
+
 const resolveIsAlive = (person: Person) => (person.deathDate ? false : person.isAlive);
 
-export const exportPeopleCsv = (persons: Person[]) => {
-  const rows = persons.map((person) => [
-    person.fullName,
-    person.birthDate ?? "",
-    person.deathDate ?? "",
-    resolveIsAlive(person) ? "true" : "false",
-    person.gender ?? "",
-    resolveLocation(person),
-    person.photoUrl ?? "",
-    person.notes?.replace(/\n/g, " ") ?? "",
-  ]);
+const formatList = (items: string[]) => items.filter(Boolean).join(" | ");
+
+export const exportPeopleCsv = (persons: Person[], relationships: Relationship[] = []) => {
+  const personById = new Map(persons.map((person) => [person.id, person]));
+  const parentLinks = relationships.filter((rel) => rel.relationshipType === "parent");
+  const partnerLinks = relationships.filter((rel) => rel.relationshipType === "partner");
+
+  const parentsByChild = new Map<string, string[]>();
+  const childrenByParent = new Map<string, string[]>();
+  const partnersByPerson = new Map<string, Array<{ partnerId: string; marriageDate?: string }>>();
+
+  parentLinks.forEach((rel) => {
+    const parents = parentsByChild.get(rel.childId) ?? [];
+    parents.push(rel.parentId);
+    parentsByChild.set(rel.childId, parents);
+
+    const children = childrenByParent.get(rel.parentId) ?? [];
+    children.push(rel.childId);
+    childrenByParent.set(rel.parentId, children);
+  });
+
+  partnerLinks.forEach((rel) => {
+    const addPartner = (personId: string, partnerId: string) => {
+      const list = partnersByPerson.get(personId) ?? [];
+      list.push({ partnerId, marriageDate: rel.marriageDate });
+      partnersByPerson.set(personId, list);
+    };
+    addPartner(rel.parentId, rel.childId);
+    addPartner(rel.childId, rel.parentId);
+  });
+
+  const rows = persons.map((person) => {
+    const parents = parentsByChild.get(person.id) ?? [];
+    const children = childrenByParent.get(person.id) ?? [];
+    const partners = partnersByPerson.get(person.id) ?? [];
+
+    const parentNames = parents
+      .map((id) => personById.get(id)?.fullName ?? "Unknown")
+      .sort((a, b) => a.localeCompare(b));
+    const childNames = children
+      .map((id) => personById.get(id)?.fullName ?? "Unknown")
+      .sort((a, b) => a.localeCompare(b));
+    const partnerNames = partners
+      .map((entry) => personById.get(entry.partnerId)?.fullName ?? "Unknown")
+      .sort((a, b) => a.localeCompare(b));
+    const partnerMarriages = partners
+      .map((entry) => {
+        const name = personById.get(entry.partnerId)?.fullName ?? "Unknown";
+        return entry.marriageDate ? `${name} (${entry.marriageDate})` : name;
+      })
+      .sort((a, b) => a.localeCompare(b));
+
+    const siblingIds = new Set<string>();
+    parents.forEach((parentId) => {
+      (childrenByParent.get(parentId) ?? []).forEach((childId) => {
+        if (childId !== person.id) siblingIds.add(childId);
+      });
+    });
+    const siblingNames = Array.from(siblingIds)
+      .map((id) => personById.get(id)?.fullName ?? "Unknown")
+      .sort((a, b) => a.localeCompare(b));
+
+    return [
+      person.id,
+      person.fullName,
+      person.birthDate ?? "",
+      person.deathDate ?? "",
+      resolveIsAlive(person) ? "true" : "false",
+      person.gender ?? "",
+      resolveLocation(person),
+      resolveOccupation(person),
+      person.photoUrl ?? "",
+      person.notes?.replace(/\n/g, " ") ?? "",
+      formatList(parentNames),
+      formatList(childNames),
+      formatList(partnerNames),
+      formatList(partnerMarriages),
+      formatList(siblingNames),
+    ];
+  });
 
   return [csvHeaders.join(","), ...rows.map((row) => row.map(escapeCsv).join(","))].join("\n");
 };
 
 const escapeCsv = (value: string) => {
-  if (value.includes(",") || value.includes('"')) {
+  if (value.includes(",") || value.includes('"') || value.includes("\n") || value.includes("\r")) {
     return `"${value.replace(/"/g, '""')}"`;
   }
   return value;
