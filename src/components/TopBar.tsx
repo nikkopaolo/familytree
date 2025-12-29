@@ -25,7 +25,10 @@ export const TopBar = ({
   onInviteAdmin,
 }: TopBarProps) => {
   const activeClanName = clans[0]?.name ?? "Katigbak";
-  const clanDisplay = activeClanName.toUpperCase();
+  const clanDisplay = activeClanName.trim() || "Katigbak";
+  const clanCaption = /family/i.test(clanDisplay)
+    ? clanDisplay
+    : `${clanDisplay} Family`;
   const canManage = role === "admin";
   const [themeOpen, setThemeOpen] = useState(false);
   const [themeMode, setThemeMode] = useState<"light" | "dark" | "system">("light");
@@ -96,7 +99,7 @@ export const TopBar = ({
           </span>
         </div>
         <p className="text-xs text-slate-600 md:text-sm">
-          Living history and connections for the {clanDisplay} Family.
+          Living history and connections for the {clanCaption}.
         </p>
       </div>
       <div className="flex flex-wrap items-center gap-2 md:justify-end">

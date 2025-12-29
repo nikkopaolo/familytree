@@ -31,19 +31,23 @@ export const ImportExportPanel = ({
   const [message, setMessage] = useState<string>("");
   const fileInputRef = useRef<HTMLInputElement | null>(null);
 
+  const dateStamp = new Date().toISOString().slice(0, 10);
+  const exportName = (base: string, extension: string) =>
+    `${base}-${dateStamp}.${extension}`;
+
   const handleExportCsv = () => {
     const csv = exportPeopleCsv(persons, relationships);
-    downloadFile(csv, "family-members.csv", "text/csv");
+    downloadFile(csv, exportName("family-members", "csv"), "text/csv");
   };
 
   const handleExportJson = () => {
     const json = exportTreeJson(persons, relationships);
-    downloadFile(json, "family-tree.json", "application/json");
+    downloadFile(json, exportName("family-tree", "json"), "application/json");
   };
 
   const handleExportGedcom = () => {
     const gedcom = exportGedcom(persons, relationships);
-    downloadFile(gedcom, "family-tree.ged", "text/plain");
+    downloadFile(gedcom, exportName("family-tree", "ged"), "text/plain");
   };
 
   const handleImport = async (event: React.ChangeEvent<HTMLInputElement>) => {
