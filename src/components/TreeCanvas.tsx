@@ -9,6 +9,7 @@ import ReactFlow, {
   type ReactFlowInstance,
 } from "reactflow";
 import "reactflow/dist/style.css";
+import { Lock, Unlock } from "lucide-react";
 import { PersonNode } from "./PersonNode";
 import { FamilyNode } from "./FamilyNode";
 import {
@@ -94,6 +95,7 @@ export const TreeCanvas = ({
     useState<TreeGenerationDirection>("both");
   const [flowInstance, setFlowInstance] = useState<ReactFlowInstance | null>(null);
   const [editingNodeId, setEditingNodeId] = useState("");
+  const [isInteractionLocked, setIsInteractionLocked] = useState(true);
   const hasPeople = persons.length > 0;
   const sortedPersons = useMemo(
     () =>
@@ -613,6 +615,23 @@ export const TreeCanvas = ({
         </div>
         <div className="ml-auto flex flex-wrap items-center gap-2">
           <button
+            className="rounded-full border border-slate-200 bg-white px-3 py-2 text-xs font-semibold text-slate-600 shadow-sm transition hover:text-slate-900"
+            onClick={() => setIsInteractionLocked((prev) => !prev)}
+            type="button"
+          >
+            {isInteractionLocked ? (
+              <span className="inline-flex items-center gap-2">
+                <Lock size={14} />
+                Unlock drag
+              </span>
+            ) : (
+              <span className="inline-flex items-center gap-2">
+                <Unlock size={14} />
+                Lock drag
+              </span>
+            )}
+          </button>
+          <button
             className="rounded-full border border-slate-200 bg-white px-3 py-2 text-xs font-semibold text-slate-600 shadow-sm transition hover:text-slate-900 disabled:cursor-not-allowed disabled:opacity-60"
             onClick={handleAutoArrange}
             disabled={isArranging}
@@ -638,6 +657,7 @@ export const TreeCanvas = ({
           edges={edges}
           nodeTypes={nodeTypes}
           fitView
+          nodesDraggable={!isInteractionLocked}
           onInit={setFlowInstance}
           onNodeClick={(_, node) => {
             if (node.type === "person") {
@@ -645,6 +665,7 @@ export const TreeCanvas = ({
             }
           }}
           onNodeDragStop={(_, node) => {
+            if (isInteractionLocked) return;
             if (node.type === "person") {
               onUpdatePosition(node.id, node.position.x, node.position.y);
             }

@@ -185,7 +185,7 @@ export default function Home() {
   }, [clanPersons, clanRelationships]);
 
   return (
-    <main className="pb-12 px-4">
+    <main className="pb-12 px-2">
       <TopBar
         clans={clans}
         role={membership?.role}
@@ -268,29 +268,6 @@ export default function Home() {
                 isMaxNodesUnlimited={unlimitedNodes}
                 onToggleMaxNodesUnlimited={setUnlimitedNodes}
               />
-              <PersonDetails
-                person={selectedPerson}
-                persons={clanPersons}
-                relationships={clanRelationships}
-                canEdit={selectedPerson ? canEditPerson(selectedPerson) : false}
-                onSubmitUpdate={handleSubmitUpdate}
-                onAddParentChild={(parentId, childId) =>
-                  createParentChildRelationship(parentId, childId)
-                }
-                onAddPartner={(personId, partnerId, marriageDate) =>
-                  createPartnerRelationship(personId, partnerId, marriageDate)
-                }
-                onUpdateRelationship={updateRelationship}
-                onDelete={deletePerson}
-                canUploadPhoto={Boolean(
-                  selectedPerson && canEditPerson(selectedPerson) && isSupabaseEnabled && !isGuest
-                )}
-                onUploadPhoto={
-                  selectedPerson
-                    ? (file) => uploadPersonPhoto(selectedPerson.id, file)
-                    : undefined
-                }
-              />
             </>
           )}
           {activeTab === "list" && (
@@ -369,6 +346,33 @@ export default function Home() {
           )}
         </div>
       </div>
+      {activeTab === "tree" && (
+        <div className="mx-auto mt-5 w-full max-w-none">
+          <PersonDetails
+            person={selectedPerson}
+            persons={clanPersons}
+            relationships={clanRelationships}
+            canEdit={selectedPerson ? canEditPerson(selectedPerson) : false}
+            onSubmitUpdate={handleSubmitUpdate}
+            onAddParentChild={(parentId, childId) =>
+              createParentChildRelationship(parentId, childId)
+            }
+            onAddPartner={(personId, partnerId, marriageDate) =>
+              createPartnerRelationship(personId, partnerId, marriageDate)
+            }
+            onUpdateRelationship={updateRelationship}
+            onDelete={deletePerson}
+            canUploadPhoto={Boolean(
+              selectedPerson && canEditPerson(selectedPerson) && isSupabaseEnabled && !isGuest
+            )}
+            onUploadPhoto={
+              selectedPerson
+                ? (file) => uploadPersonPhoto(selectedPerson.id, file)
+                : undefined
+            }
+          />
+        </div>
+      )}
       <AddChildDialog
         isOpen={Boolean(addChildParentId)}
         parent={addChildParent}
