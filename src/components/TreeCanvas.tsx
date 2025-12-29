@@ -425,7 +425,7 @@ export const TreeCanvas = ({
 
   if (!hasPeople) {
     return (
-      <section className="glass-card flex h-[640px] flex-col gap-4 rounded-3xl p-6">
+      <section className="glass-card flex min-h-[560px] h-[calc(100vh-320px)] flex-col gap-4 rounded-3xl p-6">
         <div className="flex items-center justify-between">
           <div>
             <p className="text-xs font-semibold uppercase tracking-[0.2em] text-slate-500">Tree</p>
@@ -449,18 +449,18 @@ export const TreeCanvas = ({
   }
 
   const containerClass = isFullscreen
-    ? "glass-card fixed inset-4 z-50 flex h-[calc(100vh-2rem)] flex-col gap-4 rounded-3xl p-4"
-    : "glass-card flex h-[640px] flex-col gap-4 rounded-3xl p-4";
+    ? "glass-card fixed inset-4 z-50 flex h-[calc(100vh-2rem)] flex-col gap-3 rounded-3xl p-4"
+    : "glass-card flex min-h-[560px] h-[calc(100vh-320px)] flex-col gap-3 rounded-3xl p-4";
 
   return (
     <section className={containerClass}>
-      <div className="flex flex-wrap items-center gap-4">
+      <div className="flex flex-wrap items-center gap-3">
         <div>
           <p className="text-xs font-semibold uppercase tracking-[0.2em] text-slate-500">
             Focus Branch
           </p>
           <select
-            className="mt-2 rounded-2xl border border-slate-200 bg-white px-4 py-2 text-sm font-semibold text-slate-800"
+            className="mt-1 rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm font-semibold text-slate-800"
             value={rootId}
             onChange={(event) => onRootChange(event.target.value)}
           >
@@ -477,7 +477,7 @@ export const TreeCanvas = ({
             Find Member
           </p>
           <input
-            className="mt-2 w-48 rounded-2xl border border-slate-200 bg-white px-4 py-2 text-sm font-semibold text-slate-800"
+            className="mt-1 w-44 rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm font-semibold text-slate-800"
             placeholder="Search name"
             value={searchQuery}
             onChange={(event) => setSearchQuery(event.target.value)}
@@ -506,7 +506,7 @@ export const TreeCanvas = ({
             type="number"
             min={1}
             max={8}
-            className="mt-2 w-32 rounded-2xl border border-slate-200 bg-white px-4 py-2 text-sm font-semibold text-slate-800"
+            className="mt-1 w-28 rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm font-semibold text-slate-800"
             value={maxDepthValue}
             onChange={(event) => onMaxDepthChange(Number(event.target.value))}
             disabled={isMaxDepthUnlimited}
@@ -524,7 +524,7 @@ export const TreeCanvas = ({
           <p className="text-xs font-semibold uppercase tracking-[0.2em] text-slate-500">
             Generation
           </p>
-          <div className="mt-2 flex gap-2">
+          <div className="mt-1 flex gap-2">
             {(["both", "forward", "backward"] as const).map((value) => (
               <button
                 key={value}
@@ -549,7 +549,7 @@ export const TreeCanvas = ({
             type="number"
             min={5}
             max={120}
-            className="mt-2 w-32 rounded-2xl border border-slate-200 bg-white px-4 py-2 text-sm font-semibold text-slate-800"
+            className="mt-1 w-28 rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm font-semibold text-slate-800"
             value={maxNodesValue}
             onChange={(event) => onMaxNodesChange(Number(event.target.value))}
             disabled={isMaxNodesUnlimited}
@@ -567,7 +567,7 @@ export const TreeCanvas = ({
           <p className="text-xs font-semibold uppercase tracking-[0.2em] text-slate-500">
             Filter
           </p>
-          <div className="mt-2 flex gap-2">
+          <div className="mt-1 flex gap-2">
             {(["all", "alive", "deceased"] as const).map((value) => (
               <button
                 key={value}
@@ -588,7 +588,7 @@ export const TreeCanvas = ({
           <p className="text-xs font-semibold uppercase tracking-[0.2em] text-slate-500">
             Layout
           </p>
-          <div className="mt-2 flex gap-2">
+          <div className="mt-1 flex gap-2">
             <button
               className={`rounded-full px-4 py-2 text-xs font-semibold ${
                 direction === "TB"
@@ -611,9 +611,9 @@ export const TreeCanvas = ({
             </button>
           </div>
         </div>
-        <div className="ml-auto flex flex-wrap items-center gap-3">
+        <div className="ml-auto flex flex-wrap items-center gap-2">
           <button
-            className="rounded-full border border-slate-200 bg-white px-4 py-2 text-xs font-semibold text-slate-600 shadow-sm transition hover:text-slate-900 disabled:cursor-not-allowed disabled:opacity-60"
+            className="rounded-full border border-slate-200 bg-white px-3 py-2 text-xs font-semibold text-slate-600 shadow-sm transition hover:text-slate-900 disabled:cursor-not-allowed disabled:opacity-60"
             onClick={handleAutoArrange}
             disabled={isArranging}
             type="button"
@@ -621,13 +621,13 @@ export const TreeCanvas = ({
             {isArranging ? "Arranging..." : "Auto arrange"}
           </button>
           <button
-            className="rounded-full border border-slate-200 bg-white px-4 py-2 text-xs font-semibold text-slate-600 shadow-sm transition hover:text-slate-900"
+            className="rounded-full border border-slate-200 bg-white px-3 py-2 text-xs font-semibold text-slate-600 shadow-sm transition hover:text-slate-900"
             onClick={() => setIsFullscreen((prev) => !prev)}
             type="button"
           >
             {isFullscreen ? "Exit full screen" : "Full screen"}
           </button>
-          <div className="rounded-2xl bg-white px-4 py-2 text-sm text-slate-600 shadow-sm">
+          <div className="rounded-2xl bg-white px-3 py-2 text-xs text-slate-600 shadow-sm">
             Showing {filteredPersons.length} people - {filteredRelationships.length} links
           </div>
         </div>

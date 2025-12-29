@@ -144,7 +144,7 @@ export default function Home() {
   }, [clanPersons]);
 
   return (
-    <main className="pb-16">
+    <main className="pb-12">
       <TopBar
         clans={clans}
         role={membership?.role}
@@ -164,16 +164,16 @@ export default function Home() {
         }}
       />
       <TabNav activeTab={activeTab} onChange={setActiveTab} showSuggestions={false} />
-      <div className="mx-auto mt-6 grid w-[min(1320px,94vw)] grid-cols-1 gap-6 xl:grid-cols-[minmax(0,1fr)_300px]">
+      <div className="mx-auto mt-4 grid w-[min(1440px,96vw)] grid-cols-1 gap-5 xl:grid-cols-[minmax(0,1fr)_260px]">
         <section className="flex flex-col gap-6">
-          <div className="glass-card rounded-3xl px-6 py-4">
+          <div className="glass-card rounded-3xl px-5 py-3">
             <div className="grid divide-y divide-slate-200 sm:grid-cols-3 sm:divide-y-0 sm:divide-x">
               {quickStats.map((stat) => (
-                <div key={stat.label} className="py-3 sm:px-6 sm:py-2">
-                  <p className="text-xs font-semibold uppercase tracking-[0.2em] text-slate-500">
+                <div key={stat.label} className="py-2 sm:px-5">
+                  <p className="text-[10px] font-semibold uppercase tracking-[0.25em] text-slate-500">
                     {stat.label}
                   </p>
-                  <p className="mt-2 text-3xl font-semibold text-slate-900">
+                  <p className="mt-1 text-2xl font-semibold text-slate-900">
                     {stat.value}
                   </p>
                 </div>

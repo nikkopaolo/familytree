@@ -51,32 +51,22 @@ const tabs: Array<{
 
 export const TabNav = ({ activeTab, onChange, showSuggestions = true }: TabNavProps) => {
   const visibleTabs = showSuggestions ? tabs : tabs.filter((tab) => tab.id !== "suggestions");
-  const gridCols = visibleTabs.length >= 5 ? "lg:grid-cols-5" : "lg:grid-cols-4";
   return (
-    <div className="mx-auto mt-5 w-[min(1320px,94vw)]">
-      <div className="rounded-3xl border border-white/70 bg-white/60 p-2 shadow-sm backdrop-blur">
-        <div className={`grid grid-cols-1 gap-4 ${gridCols}`}>
-          {visibleTabs.map((tab) => (
-            <button
-              key={tab.id}
-              onClick={() => onChange(tab.id)}
-              className={`group rounded-3xl border px-5 py-4 text-left transition ${
-                activeTab === tab.id
-                  ? "border-amber-300 bg-white shadow-xl shadow-amber-100"
-                  : "border-slate-200 bg-white/70 hover:border-amber-200 hover:bg-white"
-              }`}
-            >
-              <div className="flex items-center gap-3 text-sm font-semibold text-slate-700">
-                <span className="flex size-9 items-center justify-center rounded-2xl bg-amber-50 text-amber-700">
-                  {tab.icon}
-                </span>
-                {tab.label}
-              </div>
-              <p className="mt-2 text-xs text-slate-500">{tab.description}</p>
-            </button>
-          ))}
-        </div>
-      </div>
+    <div className="mx-auto mt-3 flex w-[min(1440px,96vw)] flex-wrap items-center gap-2 rounded-2xl border border-white/70 bg-white/60 px-3 py-2 shadow-sm backdrop-blur">
+      {visibleTabs.map((tab) => (
+        <button
+          key={tab.id}
+          onClick={() => onChange(tab.id)}
+          className={`inline-flex items-center gap-2 rounded-full border px-4 py-2 text-xs font-semibold transition md:text-sm ${
+            activeTab === tab.id
+              ? "border-amber-300 bg-amber-50 text-amber-900 shadow-sm"
+              : "border-transparent bg-white/70 text-slate-600 hover:border-amber-200 hover:text-amber-700"
+          }`}
+        >
+          <span className="text-amber-600">{tab.icon}</span>
+          {tab.label}
+        </button>
+      ))}
     </div>
   );
 };

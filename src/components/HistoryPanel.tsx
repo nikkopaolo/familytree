@@ -14,21 +14,36 @@ const findPersonName = (persons: Person[], id?: string) =>
 
 export const HistoryPanel = ({ events, persons }: HistoryPanelProps) => {
   const [page, setPage] = useState(1);
+  const [actorFilter, setActorFilter] = useState<"all" | "invited" | "system">("all");
   const pageSize = 6;
   const filteredEvents = useMemo(
     () =>
       events.filter(
-        (event) =>
-          event.targetType !== "position" &&
-          (event.action === "create" || event.action === "update" || event.action === "delete")
+        (event) => {
+          if (event.targetType === "position") return false;
+          if (
+            event.action !== "create" &&
+            event.action !== "update" &&
+            event.action !== "delete"
+          ) {
+            return false;
+          }
+          if (actorFilter === "invited") return Boolean(event.actorId);
+          if (actorFilter === "system") return !event.actorId;
+          return true;
+        }
       ),
-    [events]
+    [actorFilter, events]
   );
   const totalPages = Math.max(1, Math.ceil(filteredEvents.length / pageSize));
 
   useEffect(() => {
     setPage((prev) => Math.min(Math.max(1, prev), totalPages));
   }, [totalPages]);
+
+  useEffect(() => {
+    setPage(1);
+  }, [actorFilter]);
 
   const pageEvents = useMemo(() => {
     const start = (page - 1) * pageSize;
@@ -37,10 +52,30 @@ export const HistoryPanel = ({ events, persons }: HistoryPanelProps) => {
 
   return (
     <section className="glass-card rounded-3xl p-6">
-      <h2 className="text-2xl text-slate-900">Audit & Change History</h2>
-      <p className="text-sm text-slate-600">
-        Only member and relationship changes are listed here.
-      </p>
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <div>
+          <h2 className="text-2xl text-slate-900">Audit & Change History</h2>
+          <p className="text-sm text-slate-600">
+            Only member and relationship changes are listed here.
+          </p>
+        </div>
+        <div className="flex items-center gap-2 text-xs text-slate-600">
+          <span className="text-[10px] font-semibold uppercase tracking-[0.2em] text-slate-400">
+            Filter
+          </span>
+          <select
+            className="rounded-full border border-slate-200 bg-white px-3 py-2 text-xs font-semibold text-slate-700"
+            value={actorFilter}
+            onChange={(event) =>
+              setActorFilter(event.target.value as "all" | "invited" | "system")
+            }
+          >
+            <option value="all">All changes</option>
+            <option value="invited">Invited members</option>
+            <option value="system">System only</option>
+          </select>
+        </div>
+      </div>
       <div className="mt-6 space-y-4">
         {pageEvents.length === 0 && (
           <div className="rounded-2xl border border-slate-200 bg-white px-4 py-6 text-sm text-slate-500">
