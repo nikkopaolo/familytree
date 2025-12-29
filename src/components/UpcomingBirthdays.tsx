@@ -128,7 +128,7 @@ export const UpcomingBirthdays = ({
                     onClick={() => handleSelect(entry.date)}
                     type="button"
                   >
-                    <span className="flex-1 break-words font-semibold text-slate-800">
+                    <span className="flex-1 whitespace-nowrap font-semibold text-slate-800">
                       {entry.fullName}
                     </span>
                     <span className="shrink-0 text-xs text-slate-500">
@@ -155,7 +155,7 @@ export const UpcomingBirthdays = ({
                     onClick={() => handleSelect(entry.date)}
                     type="button"
                   >
-                    <span className="flex-1 break-words font-semibold text-slate-800">
+                    <span className="flex-1 whitespace-nowrap font-semibold text-slate-800">
                       {entry.label}
                     </span>
                     <span className="shrink-0 text-xs text-slate-500">
@@ -182,7 +182,7 @@ export const UpcomingBirthdays = ({
                     onClick={() => handleSelect(entry.date)}
                     type="button"
                   >
-                    <span className="flex-1 break-words font-semibold text-slate-800">
+                    <span className="flex-1 whitespace-nowrap font-semibold text-slate-800">
                       {entry.fullName}
                     </span>
                     <span className="shrink-0 text-xs text-slate-500">

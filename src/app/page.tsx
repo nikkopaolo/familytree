@@ -165,7 +165,7 @@ export default function Home() {
         }}
       />
       <TabNav activeTab={activeTab} onChange={setActiveTab} showSuggestions={false} />
-      <div className="mx-auto mt-4 grid w-[min(1600px,98vw)] grid-cols-1 gap-5 xl:grid-cols-[minmax(0,1fr)_260px]">
+      <div className="mx-auto mt-4 grid w-[calc(100%-32px)] max-w-none grid-cols-1 gap-5 xl:grid-cols-[minmax(0,1fr)_340px]">
         <section className="flex flex-col gap-6">
           <div className="glass-card rounded-3xl px-5 py-3">
             <div className="grid divide-y divide-slate-200 sm:grid-cols-3 sm:divide-y-0 sm:divide-x">

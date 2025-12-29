@@ -27,7 +27,7 @@ export const TopBar = ({
   const clanDisplay = activeClanName.toUpperCase();
   const canManage = role === "admin";
   return (
-    <header className="glass-card sticky top-4 z-20 mx-auto mt-4 flex w-[min(1600px,98vw)] flex-col gap-3 rounded-3xl px-6 py-3 md:flex-row md:items-center md:justify-between">
+    <header className="glass-card sticky top-4 z-20 mx-auto mt-4 flex w-[calc(100%-32px)] max-w-none flex-col gap-3 rounded-3xl px-6 py-3 md:flex-row md:items-center md:justify-between">
       <div className="flex flex-col gap-1">
         <div className="flex flex-wrap items-center gap-3">
           <h1 className="text-2xl text-slate-900 md:text-3xl">Katigbak Family Tree</h1>
