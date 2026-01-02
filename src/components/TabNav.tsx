@@ -1,9 +1,16 @@
 "use client";
 
 import type { ReactNode } from "react";
-import { BarChart3, GitPullRequestArrow, MessageSquare, Network, Users2 } from "lucide-react";
+import {
+  BarChart3,
+  GitPullRequestArrow,
+  MessageSquare,
+  Network,
+  Share2,
+  Users2,
+} from "lucide-react";
 
-export type AppTab = "tree" | "list" | "stats" | "history" | "suggestions";
+export type AppTab = "tree" | "compact" | "list" | "stats" | "history" | "suggestions";
 
 type TabNavProps = {
   activeTab: AppTab;
@@ -22,6 +29,12 @@ const tabs: Array<{
     label: "Tree",
     description: "Visualize and reposition branches",
     icon: <Network size={18} />,
+  },
+  {
+    id: "compact",
+    label: "Compact",
+    description: "Focus on close relationships",
+    icon: <Share2 size={18} />,
   },
   {
     id: "list",

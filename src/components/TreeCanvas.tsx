@@ -55,6 +55,7 @@ type TreeCanvasProps = {
 };
 
 const nodeTypes = { person: PersonNode, family: FamilyNode };
+const MIN_ZOOM = 0.05;
 
 export const TreeCanvas = ({
   persons,
@@ -680,6 +681,7 @@ export const TreeCanvas = ({
           edges={edges}
           nodeTypes={nodeTypes}
           fitView
+          minZoom={MIN_ZOOM}
           nodesDraggable={!isInteractionLocked}
           onNodesChange={onNodesChange}
           onInit={setFlowInstance}

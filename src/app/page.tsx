@@ -5,6 +5,7 @@ import { ImportExportPanel } from "@/components/ImportExportPanel";
 import { HistoryPanel } from "@/components/HistoryPanel";
 import { MembersTable } from "@/components/MembersTable";
 import { AuthPanel } from "@/components/AuthPanel";
+import { CompactFamilyView } from "@/components/CompactFamilyView";
 import { PersonDetails } from "@/components/PersonDetails";
 import { StatsPanel } from "@/components/StatsPanel";
 import { TabNav, type AppTab } from "@/components/TabNav";
@@ -269,6 +270,14 @@ export default function Home() {
                 onToggleMaxNodesUnlimited={setUnlimitedNodes}
               />
             </>
+          )}
+          {activeTab === "compact" && (
+            <CompactFamilyView
+              persons={clanPersons}
+              relationships={clanRelationships}
+              selectedPersonId={selectedPersonId}
+              onSelectPerson={setSelectedPersonId}
+            />
           )}
           {activeTab === "list" && (
             <>
