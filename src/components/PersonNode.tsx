@@ -2,7 +2,7 @@
 
 import Image from "next/image";
 import { useEffect, useState, type MouseEvent } from "react";
-import { differenceInMonths } from "date-fns";
+import { differenceInMonths, differenceInYears } from "date-fns";
 import { Check, Edit3, UserRound, X } from "lucide-react";
 import { Handle, Position, type NodeProps } from "reactflow";
 import { calculateAge, formatDate, formatYear, parseDateValue } from "@/lib/utils";
@@ -84,7 +84,11 @@ export const PersonNode = ({ data, selected }: NodeProps<PersonNodeData>) => {
     onLinkChild,
     onLinkPartner,
   } = data;
-  const ageLabel = calculateAge(person.birthDate, person.deathDate);
+  const liveAge = calculateAge(person.birthDate);
+  const ageAtDeath = person.deathDate
+    ? calculateAge(person.birthDate, person.deathDate)
+    : "Unknown";
+  const ageLabel = person.isAlive ? liveAge : ageAtDeath;
   const statusLabel = person.isAlive ? "Alive" : "Deceased";
   const statusTone = person.isAlive
     ? "bg-emerald-100 text-emerald-700"
@@ -116,6 +120,15 @@ export const PersonNode = ({ data, selected }: NodeProps<PersonNodeData>) => {
   });
   const locationLabel = person.stats?.location ?? "Unknown";
   const occupationLabel = person.stats?.occupation ?? "Unknown";
+  const ageDisplayLabel = person.isAlive ? "Age" : "Age at death";
+  const formatYearsSince = (value?: string) => {
+    const parsed = parseDateValue(value);
+    if (!parsed) return "Unknown";
+    const years = differenceInYears(new Date(), parsed);
+    if (years <= 0) return "<1y";
+    return `${years}y`;
+  };
+  const deceasedYearsLabel = person.isAlive ? "" : formatYearsSince(person.deathDate);
   const sortedPartners = [...links.partners].sort((a, b) =>
     a.person.fullName.localeCompare(b.person.fullName, undefined, { sensitivity: "base" })
   );
@@ -309,7 +322,7 @@ export const PersonNode = ({ data, selected }: NodeProps<PersonNodeData>) => {
           </p>
           <div className="mt-2 space-y-1">
             <div className="flex items-center justify-between gap-2">
-              <span>Age</span>
+              <span>{ageDisplayLabel}</span>
               <span className="font-semibold text-slate-700">{ageLabel}</span>
             </div>
             <div className="flex items-center justify-between gap-2">
@@ -324,6 +337,12 @@ export const PersonNode = ({ data, selected }: NodeProps<PersonNodeData>) => {
                 {person.isAlive ? "Alive" : formatDate(person.deathDate)}
               </span>
             </div>
+            {!person.isAlive && (
+              <div className="flex items-center justify-between gap-2">
+                <span>Deceased</span>
+                <span className="font-semibold text-slate-700">{deceasedYearsLabel}</span>
+              </div>
+            )}
             <div className="flex items-center justify-between gap-2">
               <span>Location</span>
               <span className="min-w-0 truncate font-semibold text-slate-700">
@@ -435,9 +454,20 @@ export const PersonNode = ({ data, selected }: NodeProps<PersonNodeData>) => {
               )}
             </div>
           </div>
-          <p className="mt-1 text-xs text-slate-500">
-            Birthday {formatDate(person.birthDate)} - Age {ageLabel}
-          </p>
+          {person.isAlive ? (
+            <p className="mt-1 text-xs text-slate-500">
+              Born {formatDate(person.birthDate)} - Age {ageLabel}
+            </p>
+          ) : (
+            <>
+              <p className="mt-1 text-xs text-slate-500">
+                Born {formatDate(person.birthDate)} - Died {formatDate(person.deathDate)}
+              </p>
+              <p className="mt-1 text-xs text-slate-500">
+                Age at death {ageLabel} - Deceased {deceasedYearsLabel}
+              </p>
+            </>
+          )}
           <p className="mt-1 text-xs text-slate-500">Location {locationLabel}</p>
         </div>
       </div>
