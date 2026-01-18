@@ -2,9 +2,10 @@
 
 import Image from "next/image";
 import { useEffect, useState, type MouseEvent } from "react";
+import { differenceInMonths } from "date-fns";
 import { Check, Edit3, UserRound, X } from "lucide-react";
 import { Handle, Position, type NodeProps } from "reactflow";
-import { calculateAge, formatDate } from "@/lib/utils";
+import { calculateAge, formatDate, formatYear, parseDateValue } from "@/lib/utils";
 import type { Person } from "@/lib/types";
 
 type PersonNodeData = {
@@ -113,6 +114,59 @@ export const PersonNode = ({ data, selected }: NodeProps<PersonNodeData>) => {
     partnerId: "",
     partnerMarriageDate: "",
   });
+  const locationLabel = person.stats?.location ?? "Unknown";
+  const occupationLabel = person.stats?.occupation ?? "Unknown";
+  const sortedPartners = [...links.partners].sort((a, b) =>
+    a.person.fullName.localeCompare(b.person.fullName, undefined, { sensitivity: "base" })
+  );
+
+  const resolvePartnerEndDate = (partner: Person) => {
+    const selfDeceased = !person.isAlive;
+    const partnerDeceased = !partner.isAlive;
+    if (!selfDeceased && !partnerDeceased) return null;
+    const selfDeath = parseDateValue(person.deathDate);
+    const partnerDeath = parseDateValue(partner.deathDate);
+    if (selfDeceased && partnerDeceased) {
+      if (selfDeath && partnerDeath) {
+        return selfDeath.getTime() <= partnerDeath.getTime() ? selfDeath : partnerDeath;
+      }
+      return selfDeath ?? partnerDeath ?? undefined;
+    }
+    const end = selfDeceased ? selfDeath : partnerDeath;
+    return end ?? undefined;
+  };
+
+  const formatPartnerDuration = (startValue: string, endDate: Date | null) => {
+    const start = parseDateValue(startValue);
+    if (!start) return null;
+    const end = endDate ?? new Date();
+    if (end.getTime() < start.getTime()) return null;
+    const totalMonths = differenceInMonths(end, start);
+    if (totalMonths <= 0) return "<1m";
+    const years = Math.floor(totalMonths / 12);
+    const months = totalMonths % 12;
+    const parts: string[] = [];
+    if (years > 0) parts.push(`${years}y`);
+    if (months > 0) parts.push(`${months}m`);
+    return parts.join(" ");
+  };
+
+  const formatPartnerTimeline = (partner: Person, marriageDate?: string) => {
+    if (!marriageDate) return "Partnered date unknown";
+    const startYear = formatYear(marriageDate);
+    const endDate = resolvePartnerEndDate(partner);
+    if (endDate === undefined) {
+      return `Partnered since ${startYear}`;
+    }
+    const duration = formatPartnerDuration(marriageDate, endDate);
+    if (!duration) {
+      return `Partnered since ${startYear}`;
+    }
+    if (endDate) {
+      return `Partnered ${duration} (${startYear}-${endDate.getFullYear()})`;
+    }
+    return `Partnered ${duration} (since ${startYear})`;
+  };
 
   useEffect(() => {
     if (isEditing) return;
@@ -214,10 +268,10 @@ export const PersonNode = ({ data, selected }: NodeProps<PersonNodeData>) => {
   };
   return (
     <div
-      className={`react-flow__node-person group relative w-[280px] min-h-[170px] overflow-visible rounded-2xl px-4 py-3 transition hover:z-[900] ${
-        isEditing ? "z-[1000]" : "z-0"
+      className={`react-flow__node-person group relative w-[280px] min-h-[170px] overflow-visible rounded-2xl px-4 py-3 transition hover:z-[3000] ${
+        isEditing ? "z-[3100]" : "z-0"
       } ${selected ? "ring-2 ring-amber-300" : "ring-0"}`}
-      style={isEditing ? { zIndex: 1000 } : undefined}
+      style={isEditing ? { zIndex: 3100 } : undefined}
     >
       <Handle id="parent-top" type="target" position={Position.Top} style={{ opacity: 0 }} />
       <Handle id="parent-bottom" type="source" position={Position.Bottom} style={{ opacity: 0 }} />
@@ -227,7 +281,7 @@ export const PersonNode = ({ data, selected }: NodeProps<PersonNodeData>) => {
       <Handle id="partner-bottom" type="source" position={Position.Bottom} style={{ opacity: 0 }} />
       <Handle id="partner-left" type="target" position={Position.Left} style={{ opacity: 0 }} />
       <Handle id="partner-right" type="source" position={Position.Right} style={{ opacity: 0 }} />
-      <div className="pointer-events-none absolute left-full top-3 z-[950] hidden w-44 translate-x-2 rounded-2xl border border-slate-200 bg-white/95 p-3 text-xs text-slate-600 shadow-xl backdrop-blur group-hover:block">
+      <div className="pointer-events-none absolute left-full top-3 z-[3200] hidden w-60 translate-x-2 rounded-2xl border border-slate-200 bg-white/95 p-3 text-xs text-slate-600 shadow-xl backdrop-blur group-hover:block">
         <p className="text-[11px] font-semibold uppercase tracking-[0.2em] text-slate-400">
           Live stats
         </p>
@@ -249,6 +303,76 @@ export const PersonNode = ({ data, selected }: NodeProps<PersonNodeData>) => {
             <span className="font-semibold text-slate-700">{stats.siblings}</span>
           </div>
         </div>
+        <div className="mt-3 border-t border-slate-200/70 pt-2">
+          <p className="text-[10px] font-semibold uppercase tracking-[0.2em] text-slate-400">
+            Profile
+          </p>
+          <div className="mt-2 space-y-1">
+            <div className="flex items-center justify-between gap-2">
+              <span>Age</span>
+              <span className="font-semibold text-slate-700">{ageLabel}</span>
+            </div>
+            <div className="flex items-center justify-between gap-2">
+              <span>Born</span>
+              <span className="font-semibold text-slate-700">
+                {formatDate(person.birthDate)}
+              </span>
+            </div>
+            <div className="flex items-center justify-between gap-2">
+              <span>Died</span>
+              <span className="font-semibold text-slate-700">
+                {person.isAlive ? "Alive" : formatDate(person.deathDate)}
+              </span>
+            </div>
+            <div className="flex items-center justify-between gap-2">
+              <span>Location</span>
+              <span className="min-w-0 truncate font-semibold text-slate-700">
+                {locationLabel}
+              </span>
+            </div>
+            <div className="flex items-center justify-between gap-2">
+              <span>Occupation</span>
+              <span className="min-w-0 truncate font-semibold text-slate-700">
+                {occupationLabel}
+              </span>
+            </div>
+          </div>
+        </div>
+        {sortedPartners.length > 0 && (
+          <div className="mt-3 border-t border-slate-200/70 pt-2">
+            <p className="text-[10px] font-semibold uppercase tracking-[0.2em] text-slate-400">
+              Partner timeline
+            </p>
+            <div className="mt-2 space-y-2">
+              {sortedPartners.slice(0, 3).map((entry) => {
+                const partnerStatus = entry.person.isAlive ? "Alive" : "Deceased";
+                const partnerTone = entry.person.isAlive
+                  ? "bg-emerald-100 text-emerald-700"
+                  : "bg-rose-100 text-rose-700";
+                return (
+                  <div key={entry.id} className="space-y-1">
+                    <div className="flex items-center justify-between gap-2">
+                      <span className="min-w-0 truncate font-semibold text-slate-700">
+                        {entry.person.fullName}
+                      </span>
+                      <span className={`rounded-full px-2 py-0.5 text-[9px] font-semibold ${partnerTone}`}>
+                        {partnerStatus}
+                      </span>
+                    </div>
+                    <p className="text-[10px] text-slate-400">
+                      {formatPartnerTimeline(entry.person, entry.marriageDate)}
+                    </p>
+                  </div>
+                );
+              })}
+              {sortedPartners.length > 3 && (
+                <p className="text-[10px] text-slate-400">
+                  +{sortedPartners.length - 3} more partner(s)
+                </p>
+              )}
+            </div>
+          </div>
+        )}
       </div>
       <div className="flex gap-3">
         <div className="flex flex-col items-center gap-2">
@@ -314,9 +438,7 @@ export const PersonNode = ({ data, selected }: NodeProps<PersonNodeData>) => {
           <p className="mt-1 text-xs text-slate-500">
             Birthday {formatDate(person.birthDate)} - Age {ageLabel}
           </p>
-          <p className="mt-1 text-xs text-slate-500">
-            Location {person.stats?.location ?? "Unknown"}
-          </p>
+          <p className="mt-1 text-xs text-slate-500">Location {locationLabel}</p>
         </div>
       </div>
       {isEditing ? (

@@ -1,10 +1,12 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import ReactFlow, {
   Background,
   Controls,
   Node,
+  applyNodeChanges,
+  type NodeChange,
   type ReactFlowInstance,
   useNodesState,
 } from "reactflow";
@@ -15,6 +17,9 @@ import { FamilyNode } from "./FamilyNode";
 import {
   buildTreeGraph,
   filterTree,
+  FAMILY_NODE_SIZE,
+  NODE_HEIGHT,
+  NODE_WIDTH,
   TreeGenerationDirection,
   TreeLayoutDirection,
 } from "@/lib/tree";
@@ -97,7 +102,7 @@ export const TreeCanvas = ({
   const [flowInstance, setFlowInstance] = useState<ReactFlowInstance | null>(null);
   const [editingNodeId, setEditingNodeId] = useState("");
   const [isInteractionLocked, setIsInteractionLocked] = useState(true);
-  const [renderNodes, setRenderNodes, onNodesChange] = useNodesState<Node>([]);
+  const [renderNodes, setRenderNodes] = useNodesState<Node>([]);
   const positionKey = useMemo(
     () => JSON.stringify({ positions, manualPositions }),
     [positions, manualPositions]
@@ -110,6 +115,80 @@ export const TreeCanvas = ({
         a.fullName.localeCompare(b.fullName, undefined, { sensitivity: "base" })
       ),
     [persons]
+  );
+
+  const adjustFamilyPositions = useCallback((nodes: Node[]) => {
+    const personCenters = new Map<string, { x: number; y: number }>();
+    nodes.forEach((node) => {
+      if (node.type !== "person") return;
+      personCenters.set(node.id, {
+        x: node.position.x + NODE_WIDTH / 2,
+        y: node.position.y + NODE_HEIGHT / 2,
+      });
+    });
+
+    const averageCenter = (centers: Array<{ x: number; y: number }>) => ({
+      x: centers.reduce((acc, item) => acc + item.x, 0) / centers.length,
+      y: centers.reduce((acc, item) => acc + item.y, 0) / centers.length,
+    });
+
+    let changed = false;
+    const next = nodes.map((node) => {
+      if (node.type !== "family") return node;
+      const data = node.data as {
+        parents?: string[];
+        children?: string[];
+        direction?: TreeLayoutDirection;
+      };
+      const parents = data?.parents ?? [];
+      const children = data?.children ?? [];
+      const parentCenters = parents
+        .map((id) => personCenters.get(id))
+        .filter(Boolean) as Array<{ x: number; y: number }>;
+      const childCenters = children
+        .map((id) => personCenters.get(id))
+        .filter(Boolean) as Array<{ x: number; y: number }>;
+      if (parentCenters.length === 0 && childCenters.length === 0) return node;
+
+      const parentAvg = parentCenters.length > 0 ? averageCenter(parentCenters) : null;
+      const childAvg = childCenters.length > 0 ? averageCenter(childCenters) : null;
+      const direction = data?.direction ?? "TB";
+
+      let centerX = parentAvg?.x ?? childAvg?.x ?? node.position.x + FAMILY_NODE_SIZE / 2;
+      let centerY = parentAvg?.y ?? childAvg?.y ?? node.position.y + FAMILY_NODE_SIZE / 2;
+
+      if (parentAvg && childAvg) {
+        if (direction === "TB") {
+          centerX = parentAvg.x;
+          centerY = (parentAvg.y + childAvg.y) / 2;
+        } else {
+          centerX = (parentAvg.x + childAvg.x) / 2;
+          centerY = parentAvg.y;
+        }
+      }
+
+      const nextPos = {
+        x: centerX - FAMILY_NODE_SIZE / 2,
+        y: centerY - FAMILY_NODE_SIZE / 2,
+      };
+      if (
+        Math.abs(nextPos.x - node.position.x) > 0.5 ||
+        Math.abs(nextPos.y - node.position.y) > 0.5
+      ) {
+        changed = true;
+        return { ...node, position: nextPos };
+      }
+      return node;
+    });
+
+    return changed ? next : nodes;
+  }, []);
+
+  const handleNodesChange = useCallback(
+    (changes: NodeChange[]) => {
+      setRenderNodes((prev) => adjustFamilyPositions(applyNodeChanges(changes, prev)));
+    },
+    [adjustFamilyPositions, setRenderNodes]
   );
 
   useEffect(() => {
@@ -357,12 +436,13 @@ export const TreeCanvas = ({
         eligiblePartners: [],
       };
       const isEditing = editingNodeId === node.id;
+      const editingZ = 3100;
       return {
         ...node,
-        zIndex: isEditing ? 1000 : node.zIndex,
+        zIndex: isEditing ? editingZ : node.zIndex,
         style: {
           ...(node.style ?? {}),
-          zIndex: isEditing ? 1000 : node.style?.zIndex,
+          zIndex: isEditing ? editingZ : node.style?.zIndex,
         },
         data: {
           person,
@@ -413,9 +493,9 @@ export const TreeCanvas = ({
   useEffect(() => {
     const shouldReplacePositions = positionKey !== lastPositionKey.current;
     setRenderNodes((prev) => {
-      if (prev.length === 0) return interactiveNodes;
+      if (prev.length === 0) return adjustFamilyPositions(interactiveNodes);
       const prevById = new Map(prev.map((node) => [node.id, node]));
-      return interactiveNodes.map((node) => {
+      const nextNodes = interactiveNodes.map((node) => {
         const prevNode = prevById.get(node.id);
         if (!prevNode) return node;
         return {
@@ -423,9 +503,10 @@ export const TreeCanvas = ({
           position: shouldReplacePositions ? node.position : prevNode.position,
         };
       });
+      return adjustFamilyPositions(nextNodes);
     });
     lastPositionKey.current = positionKey;
-  }, [interactiveNodes, positionKey, setRenderNodes]);
+  }, [adjustFamilyPositions, interactiveNodes, positionKey, setRenderNodes]);
 
   const handleAutoArrange = async () => {
     if (isArranging || filteredPersons.length === 0) return;
@@ -683,7 +764,7 @@ export const TreeCanvas = ({
           fitView
           minZoom={MIN_ZOOM}
           nodesDraggable={!isInteractionLocked}
-          onNodesChange={onNodesChange}
+          onNodesChange={handleNodesChange}
           onInit={setFlowInstance}
           onNodeClick={(_, node) => {
             if (node.type === "person") {

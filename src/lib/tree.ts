@@ -2,9 +2,9 @@ import dagre from "dagre";
 import type { Edge, Node } from "reactflow";
 import type { Person, Relationship, PersonPosition } from "./types";
 
-const NODE_WIDTH = 280;
-const NODE_HEIGHT = 170;
-const FAMILY_NODE_SIZE = 12;
+export const NODE_WIDTH = 280;
+export const NODE_HEIGHT = 170;
+export const FAMILY_NODE_SIZE = 12;
 const PARTNER_EDGE_WEIGHT = 8;
 const PARTNER_EDGE_MINLEN = 1;
 const FAMILY_PARENT_GAP = 90;
@@ -516,13 +516,6 @@ export const buildTreeGraph = ({
     fontWeight: 600,
   };
 
-  const familyByPairKey = new Map<string, FamilyUnit>();
-  familyById.forEach((family) => {
-    if (family.parents.length === 2) {
-      familyByPairKey.set(normalizePair(family.parents[0], family.parents[1]), family);
-    }
-  });
-
   familyById.forEach((family) => {
     family.parents.forEach((parentId) => {
       familyConnectorEdges.push({
@@ -590,9 +583,6 @@ export const buildTreeGraph = ({
   });
 
   partnerLinks.forEach((rel) => {
-    const pairKey = normalizePair(rel.parentId, rel.childId);
-    const family = familyByPairKey.get(pairKey);
-    if (family && family.children.length > 0) return;
     const edge = getPartnerEdge(rel.parentId, rel.childId);
     partnerEdges.push({
       id: rel.id,
