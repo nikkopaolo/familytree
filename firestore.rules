@@ -24,7 +24,7 @@ service cloud.firestore {
     }
 
     match /clans/{clanId} {
-      allow read: if clanIsPublic(clanId) || isMember(clanId);
+      allow read: if resource.data.isPublic == true || isMember(clanId);
       allow create: if signedIn();
       allow update, delete: if isAdmin(clanId);
 
