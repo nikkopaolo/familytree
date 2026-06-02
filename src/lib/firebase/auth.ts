@@ -46,7 +46,14 @@ export const signInWithEmail = async (email: string) => {
     }
     return { error: "" };
   } catch (err) {
-    return { error: err instanceof Error ? err.message : "Sign-in failed." };
+    const message = err instanceof Error ? err.message : "Sign-in failed.";
+    if (message.includes("auth/configuration-not-found")) {
+      return {
+        error:
+          "Firebase Auth is not enabled for email-link sign-in. Enable Authentication > Sign-in method > Email/Password, then turn on Email link.",
+      };
+    }
+    return { error: message };
   }
 };
 
