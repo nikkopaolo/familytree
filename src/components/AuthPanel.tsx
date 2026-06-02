@@ -5,7 +5,7 @@ import { LogIn, LogOut, ShieldCheck } from "lucide-react";
 import type { MembershipRole, UserProfile } from "@/lib/types";
 
 type AuthPanelProps = {
-  isSupabaseEnabled: boolean;
+  isFirebaseEnabled: boolean;
   isGuest: boolean;
   currentUser: UserProfile;
   role?: MembershipRole;
@@ -15,7 +15,7 @@ type AuthPanelProps = {
 };
 
 export const AuthPanel = ({
-  isSupabaseEnabled,
+  isFirebaseEnabled,
   isGuest,
   currentUser,
   role,
@@ -40,12 +40,12 @@ export const AuthPanel = ({
     }
   };
 
-  if (!isSupabaseEnabled) {
+  if (!isFirebaseEnabled) {
     return (
       <aside className="glass-card rounded-3xl p-6">
         <h3 className="text-xl text-slate-900">Authentication</h3>
         <p className="mt-2 text-sm text-slate-600">
-          Supabase is not configured. The app is running on mock data only.
+          Firebase is not configured. The app is running in offline mode only.
         </p>
       </aside>
     );

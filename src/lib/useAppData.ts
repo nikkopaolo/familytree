@@ -3,7 +3,16 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { diffPerson } from "./diff";
 import { initialData } from "./initialData";
-import { isSupabaseConfigured, supabase } from "./supabaseClient";
+import { isFirebaseConfigured } from "./firebase/config";
+import {
+  completeEmailLinkSignIn,
+  getIdToken,
+  signInWithEmail as firebaseSignIn,
+  signOut as firebaseSignOut,
+  subscribeAuth,
+} from "./firebase/auth";
+import * as firestoreApi from "./firebase/db";
+import { uploadPersonPhoto as uploadPhotoToStorage } from "./firebase/storage";
 import type {
   ChangeEvent,
   Clan,
@@ -205,7 +214,7 @@ export const useAppData = () => {
   const [selectedPersonId, setSelectedPersonId] = useState<string>("");
   const [adminBootstrapError, setAdminBootstrapError] = useState("");
 
-  const isSupabaseEnabled = Boolean(isSupabaseConfigured && supabase);
+  const isFirebaseEnabled = isFirebaseConfigured;
   const membershipsRef = useRef(memberships);
 
   useEffect(() => {
@@ -213,12 +222,12 @@ export const useAppData = () => {
   }, [memberships]);
 
   useEffect(() => {
-    if (!isSupabaseEnabled) return;
+    if (!isFirebaseEnabled) return;
     const storedId = getStoredClanId();
     if (storedId && isUuid(storedId)) {
       setActiveClanId((prev) => (storedId !== prev ? storedId : prev));
     }
-  }, [isSupabaseEnabled]);
+  }, [isFirebaseEnabled]);
 
   const membership = useMemo(
     () => memberships.find((item) => item.clanId === activeClanId),
@@ -258,27 +267,18 @@ export const useAppData = () => {
   const actorLabel = currentUser.email || currentUser.name || "Member";
 
   const signInWithEmail = async (email: string) => {
-    if (!supabase) return { error: "Supabase not configured." };
-    const redirectTo =
-      typeof window !== "undefined"
-        ? `${window.location.origin}`
-        : process.env.NEXT_PUBLIC_SITE_URL;
-    const { error } = await supabase.auth.signInWithOtp({
-      email,
-      options: redirectTo ? { emailRedirectTo: redirectTo } : undefined,
-    });
-    return { error: error?.message };
+    if (!isFirebaseEnabled) return { error: "Firebase is not configured." };
+    return firebaseSignIn(email);
   };
 
   const signOut = async () => {
-    if (!supabase) return;
-    await supabase.auth.signOut();
+    if (!isFirebaseEnabled) return;
+    await firebaseSignOut();
   };
 
   const bootstrapAdmin = useCallback(async () => {
-    if (!supabase) return;
-    const { data: sessionData } = await supabase.auth.getSession();
-    const token = sessionData.session?.access_token;
+    if (!isFirebaseEnabled) return;
+    const token = await getIdToken();
     if (!token) return;
     const response = await fetch("/api/admin/bootstrap", {
       method: "POST",
@@ -293,9 +293,8 @@ export const useAppData = () => {
   }, [setAdminBootstrapError]);
 
   const inviteAdmin = async (email: string, clanId: string) => {
-    if (!supabase) return { error: "Supabase not configured." };
-    const { data: sessionData } = await supabase.auth.getSession();
-    const token = sessionData.session?.access_token;
+    if (!isFirebaseEnabled) return { error: "Firebase is not configured." };
+    const token = await getIdToken();
     if (!token) return { error: "Not signed in." };
     const response = await fetch("/api/admin/invite", {
       method: "POST",
@@ -318,7 +317,7 @@ export const useAppData = () => {
     const updated: Person = { ...target, ...normalizedPayload } as Person;
     const diff = diffPerson(target, updated);
 
-    if (!isSupabaseEnabled || !supabase) {
+    if (!isFirebaseEnabled) {
       setPersons((prev) => prev.map((person) => (person.id === updated.id ? updated : person)));
       setChangeEvents((prev) => [
         {
@@ -337,26 +336,23 @@ export const useAppData = () => {
       return;
     }
 
-    const { data: updatedRow } = await supabase
-      .from("persons")
-      .update(toPersonUpdateRow(normalizedPayload))
-      .eq("id", personId)
-      .select()
-      .single();
-
-    if (updatedRow) {
-      const nextPerson = mapPersonRow(updatedRow);
+    const nextPerson = await firestoreApi.updatePerson(
+      activeClanId,
+      personId,
+      normalizedPayload
+    );
+    if (nextPerson) {
       setPersons((prev) => prev.map((person) => (person.id === nextPerson.id ? nextPerson : person)));
     }
 
-    await supabase.from("change_events").insert({
-      clan_id: activeClanId,
-      actor_id: currentUser.id,
-      actor_name: actorLabel,
-      target_type: "person",
-      target_id: personId,
+    await firestoreApi.insertChangeEvent(activeClanId, {
+      actorId: currentUser.id,
+      actorName: actorLabel,
+      targetType: "person",
+      targetId: personId,
       action: "update",
       diff,
+      createdAt: new Date().toISOString(),
     });
 
     setChangeEvents((prev) => [
@@ -394,7 +390,7 @@ export const useAppData = () => {
 
     const diff = [{ field: "fullName", before: target.fullName, after: "-" }];
 
-    if (!isSupabaseEnabled || !supabase) {
+    if (!isFirebaseEnabled) {
       setChangeEvents((prev) => [
         {
           id: crypto.randomUUID(),
@@ -413,8 +409,7 @@ export const useAppData = () => {
     }
 
     let deletedViaAdmin = false;
-    const { data: sessionData } = await supabase.auth.getSession();
-    const token = sessionData.session?.access_token;
+    const token = await getIdToken();
     if (token) {
       const response = await fetch("/api/admin/delete-person", {
         method: "POST",
@@ -428,27 +423,17 @@ export const useAppData = () => {
     }
 
     if (!deletedViaAdmin) {
-      await supabase
-        .from("relationships")
-        .delete()
-        .eq("clan_id", activeClanId)
-        .or(`parent_id.eq.${personId},child_id.eq.${personId}`);
-      await supabase
-        .from("person_positions")
-        .delete()
-        .eq("clan_id", activeClanId)
-        .eq("person_id", personId);
-      await supabase.from("persons").delete().eq("id", personId);
+      await firestoreApi.deletePersonTree(activeClanId, personId);
     }
 
-    await supabase.from("change_events").insert({
-      clan_id: activeClanId,
-      actor_id: currentUser.id,
-      actor_name: actorLabel,
-      target_type: "person",
-      target_id: personId,
+    await firestoreApi.insertChangeEvent(activeClanId, {
+      actorId: currentUser.id,
+      actorName: actorLabel,
+      targetType: "person",
+      targetId: personId,
       action: "delete",
       diff,
+      createdAt: new Date().toISOString(),
     });
 
     setChangeEvents((prev) => [
@@ -484,7 +469,7 @@ export const useAppData = () => {
       createdAt: new Date().toISOString(),
     };
 
-    if (!isSupabaseEnabled || !supabase) {
+    if (!isFirebaseEnabled) {
       setPersons((prev) => [person, ...prev]);
       setChangeEvents((prev) => [
         {
@@ -504,36 +489,19 @@ export const useAppData = () => {
       return person;
     }
 
-    const { data: inserted } = await supabase
-      .from("persons")
-      .insert({
-        id: person.id,
-        clan_id: activeClanId,
-        branch_root_id: person.branchRootId ?? null,
-        full_name: person.fullName,
-        birth_date: person.birthDate ?? null,
-        death_date: person.deathDate ?? null,
-        is_alive: person.isAlive,
-        gender: person.gender ?? null,
-        photo_url: person.photoUrl ?? null,
-        notes: person.notes ?? null,
-        stats: person.stats ?? {},
-      })
-      .select()
-      .single();
-
-    const nextPerson = inserted ? mapPersonRow(inserted) : person;
+    const nextPerson =
+      (await firestoreApi.upsertPerson({ ...person, clanId: activeClanId })) ?? person;
     setPersons((prev) => [nextPerson, ...prev]);
     setSelectedPersonId(nextPerson.id);
 
-    await supabase.from("change_events").insert({
-      clan_id: activeClanId,
-      actor_id: currentUser.id,
-      actor_name: actorLabel,
-      target_type: "person",
-      target_id: nextPerson.id,
+    await firestoreApi.insertChangeEvent(activeClanId, {
+      actorId: currentUser.id,
+      actorName: actorLabel,
+      targetType: "person",
+      targetId: nextPerson.id,
       action: "create",
       diff: [{ field: "fullName", before: "-", after: nextPerson.fullName }],
+      createdAt: new Date().toISOString(),
     });
 
     setChangeEvents((prev) => [
@@ -606,8 +574,7 @@ export const useAppData = () => {
           { field: "child", before: "-", after: personBId },
         ];
 
-    const client = supabase;
-    if (!isSupabaseEnabled || !client) {
+    if (!isFirebaseEnabled) {
       setRelationships((prev) => [relationship, ...prev]);
       setChangeEvents((prev) => [
         {
@@ -626,30 +593,19 @@ export const useAppData = () => {
       return relationship;
     }
 
-    const { data: inserted } = await client
-      .from("relationships")
-      .insert({
-        id: relationship.id,
-        clan_id: activeClanId,
-        parent_id: personAId,
-        child_id: personBId,
-        relationship_type: relationshipType,
-        marriage_date: normalizedMarriageDate,
-      })
-      .select()
-      .single();
-
-    const nextRel = inserted ? mapRelationshipRow(inserted) : relationship;
+    const nextRel =
+      (await firestoreApi.insertRelationship({ ...relationship, clanId: activeClanId })) ??
+      relationship;
     setRelationships((prev) => [nextRel, ...prev]);
 
-    await client.from("change_events").insert({
-      clan_id: activeClanId,
-      actor_id: currentUser.id,
-      actor_name: actorLabel,
-      target_type: "relationship",
-      target_id: nextRel.id,
+    await firestoreApi.insertChangeEvent(activeClanId, {
+      actorId: currentUser.id,
+      actorName: actorLabel,
+      targetType: "relationship",
+      targetId: nextRel.id,
       action: "create",
       diff: changeDiff,
+      createdAt: new Date().toISOString(),
     });
 
     setChangeEvents((prev) => [
@@ -707,7 +663,7 @@ export const useAppData = () => {
       });
     }
 
-    if (!isSupabaseEnabled || !supabase) {
+    if (!isFirebaseEnabled) {
       setRelationships((prev) =>
         prev.map((rel) => (rel.id === relationshipId ? updated : rel))
       );
@@ -728,28 +684,21 @@ export const useAppData = () => {
       return;
     }
 
-    const { data: updatedRow } = await supabase
-      .from("relationships")
-      .update(toRelationshipUpdateRow({ marriageDate: normalizedMarriageDate }))
-      .eq("id", relationshipId)
-      .select()
-      .single();
+    await firestoreApi.updateRelationshipDoc(activeClanId, relationshipId, {
+      marriageDate: normalizedMarriageDate,
+    });
+    setRelationships((prev) =>
+      prev.map((rel) => (rel.id === relationshipId ? updated : rel))
+    );
 
-    if (updatedRow) {
-      const nextRelationship = mapRelationshipRow(updatedRow);
-      setRelationships((prev) =>
-        prev.map((rel) => (rel.id === nextRelationship.id ? nextRelationship : rel))
-      );
-    }
-
-    await supabase.from("change_events").insert({
-      clan_id: activeClanId,
-      actor_id: currentUser.id,
-      actor_name: actorLabel,
-      target_type: "relationship",
-      target_id: relationshipId,
+    await firestoreApi.insertChangeEvent(activeClanId, {
+      actorId: currentUser.id,
+      actorName: actorLabel,
+      targetType: "relationship",
+      targetId: relationshipId,
       action: "update",
       diff,
+      createdAt: new Date().toISOString(),
     });
 
     setChangeEvents((prev) => [
@@ -782,7 +731,7 @@ export const useAppData = () => {
       },
     ];
 
-    if (!isSupabaseEnabled || !supabase) {
+    if (!isFirebaseEnabled) {
       setChangeEvents((prev) => [
         {
           id: crypto.randomUUID(),
@@ -801,8 +750,7 @@ export const useAppData = () => {
     }
 
     let deletedViaAdmin = false;
-    const { data: sessionData } = await supabase.auth.getSession();
-    const token = sessionData.session?.access_token;
+    const token = await getIdToken();
     if (token) {
       const response = await fetch("/api/admin/delete-relationship", {
         method: "POST",
@@ -816,17 +764,17 @@ export const useAppData = () => {
     }
 
     if (!deletedViaAdmin) {
-      await supabase.from("relationships").delete().eq("id", relationshipId);
+      await firestoreApi.deleteRelationshipDoc(activeClanId, relationshipId);
     }
 
-    await supabase.from("change_events").insert({
-      clan_id: activeClanId,
-      actor_id: currentUser.id,
-      actor_name: actorLabel,
-      target_type: "relationship",
-      target_id: relationshipId,
+    await firestoreApi.insertChangeEvent(activeClanId, {
+      actorId: currentUser.id,
+      actorName: actorLabel,
+      targetType: "relationship",
+      targetId: relationshipId,
       action: "delete",
       diff,
+      createdAt: new Date().toISOString(),
     });
 
     setChangeEvents((prev) => [
@@ -848,7 +796,7 @@ export const useAppData = () => {
   const wipeClanData = async () => {
     if (!activeClanId) return { error: "Missing clan." };
 
-    if (!isSupabaseEnabled || !supabase) {
+    if (!isFirebaseEnabled) {
       setPersons((prev) => prev.filter((person) => person.clanId !== activeClanId));
       setRelationships((prev) => prev.filter((rel) => rel.clanId !== activeClanId));
       setPositions((prev) => prev.filter((pos) => pos.clanId !== activeClanId));
@@ -858,8 +806,7 @@ export const useAppData = () => {
     }
 
     let deletedViaAdmin = false;
-    const { data: sessionData } = await supabase.auth.getSession();
-    const token = sessionData.session?.access_token;
+    const token = await getIdToken();
     if (token) {
       const response = await fetch("/api/admin/wipe-clan", {
         method: "POST",
@@ -873,11 +820,7 @@ export const useAppData = () => {
     }
 
     if (!deletedViaAdmin) {
-      await supabase.from("relationships").delete().eq("clan_id", activeClanId);
-      await supabase.from("person_positions").delete().eq("clan_id", activeClanId);
-      await supabase.from("suggestions").delete().eq("clan_id", activeClanId);
-      await supabase.from("change_events").delete().eq("clan_id", activeClanId);
-      await supabase.from("persons").delete().eq("clan_id", activeClanId);
+      await firestoreApi.wipeClanClient(activeClanId);
     }
 
     setPersons((prev) => prev.filter((person) => person.clanId !== activeClanId));
@@ -894,57 +837,34 @@ export const useAppData = () => {
       [personId]: { x, y },
     }));
 
-    if (!isSupabaseEnabled || !supabase) return;
+    if (!isFirebaseEnabled) return;
 
-    await supabase.from("person_positions").upsert({
-      person_id: personId,
-      clan_id: activeClanId,
-      x,
-      y,
-    });
+    await firestoreApi.upsertPosition(activeClanId, personId, x, y);
   };
 
   const uploadPersonPhoto = async (personId: string, file: File) => {
-    if (!isSupabaseEnabled || !supabase) return { error: "Supabase not configured." };
-    const ext = file.name.split(".").pop() || "jpg";
-    const safeName = file.name.replace(/[^a-z0-9.\-_]/gi, "_");
-    const path = `${activeClanId}/${personId}/${Date.now()}_${safeName}`;
-
-    const { error: uploadError } = await supabase
-      .storage
-      .from("person-photos")
-      .upload(path, file, { upsert: true });
-
-    if (uploadError) {
-      return { error: uploadError.message };
-    }
-
-    const { data: publicUrl } = supabase.storage
-      .from("person-photos")
-      .getPublicUrl(path);
-
-    const photoUrl = publicUrl.publicUrl;
-
-    await applyPersonUpdate(personId, { photoUrl });
+    if (!isFirebaseEnabled) return { error: "Firebase is not configured." };
+    const { error, url } = await uploadPhotoToStorage(activeClanId, personId, file);
+    if (error) return { error };
+    await applyPersonUpdate(personId, { photoUrl: url });
     return { error: "" };
   };
 
     const importPeople = async (rows: Array<Record<string, string>>) => {
-      if (isSupabaseEnabled && !isAdmin) {
+      if (isFirebaseEnabled && !isAdmin) {
         return { error: "Sign in as a clan admin to import." };
       }
       let clanId = activeClanId;
     const validClan = clans.find((clan) => clan.id === clanId);
     if (!validClan || !isUuid(clanId)) {
-      if (isSupabaseEnabled && supabase) {
-        const { data: clanRows } = await supabase.from("clans").select("id").limit(1);
-        clanId = clanRows?.[0]?.id ?? "";
+      if (isFirebaseEnabled) {
+        clanId = await firestoreApi.getFirstClanId();
         if (clanId) {
           setActiveClanId(clanId);
         }
       }
     }
-      if (isSupabaseEnabled && (!clanId || !isUuid(clanId))) {
+      if (isFirebaseEnabled && (!clanId || !isUuid(clanId))) {
         return { error: "No valid clan selected for import." };
       }
       const normalizeNameKey = (value: string) => value.trim().toLowerCase();
@@ -1158,7 +1078,7 @@ export const useAppData = () => {
         });
       });
 
-      if (!isSupabaseEnabled || !supabase) {
+      if (!isFirebaseEnabled) {
         setPersons((prev) => [...imported, ...prev]);
         if (importedRelationships.length > 0) {
           setRelationships((prev) => [...importedRelationships, ...prev]);
@@ -1166,76 +1086,37 @@ export const useAppData = () => {
         return { error: "" };
       }
 
-      const { data: inserted } = await supabase
-        .from("persons")
-        .upsert(
-        imported.map((person) => ({
-          id: person.id,
-          clan_id: clanId,
-          full_name: person.fullName,
-          birth_date: person.birthDate ?? null,
-          death_date: person.deathDate ?? null,
-          is_alive: person.isAlive,
-          gender: person.gender ?? null,
-          photo_url: person.photoUrl ?? null,
-          notes: person.notes ?? null,
-          stats: person.stats ?? {},
-        })),
-        { onConflict: "id" }
-        )
-        .select();
-
-      if (inserted) {
-        setPersons((prev) => [
-          ...inserted.map(mapPersonRow),
-          ...prev.filter((person) => person.clanId !== activeClanId),
-        ]);
-      }
+      await firestoreApi.batchUpsertPersons(clanId, imported);
+      setPersons((prev) => [
+        ...imported,
+        ...prev.filter((person) => person.clanId !== activeClanId),
+      ]);
       if (importedRelationships.length > 0) {
-        const { data: relationshipRows, error: relationshipError } = await supabase
-          .from("relationships")
-          .upsert(
-            importedRelationships.map((rel) => ({
-              id: rel.id,
-              clan_id: clanId,
-              parent_id: rel.parentId,
-              child_id: rel.childId,
-              relationship_type: rel.relationshipType,
-              marriage_date: rel.marriageDate ?? null,
-            })),
-            { onConflict: "id" }
-          )
-          .select();
-        if (relationshipError) {
-          return { error: relationshipError.message };
-        }
-        if (relationshipRows) {
-          setRelationships((prev) => [
-            ...relationshipRows.map(mapRelationshipRow),
-            ...prev.filter((rel) => rel.clanId !== activeClanId),
-          ]);
-        }
+        await firestoreApi.batchUpsertRelationships(clanId, importedRelationships);
+        setRelationships((prev) => [
+          ...importedRelationships,
+          ...prev.filter((rel) => rel.clanId !== activeClanId),
+        ]);
       }
       return { error: "" };
     };
 
   const importTreeJson = async (payload: { persons: Person[]; relationships: Relationship[] }) => {
-    if (isSupabaseEnabled && !isAdmin) {
+    if (isFirebaseEnabled && !isAdmin) {
       return { error: "Sign in as a clan admin to import." };
     }
 
     let clanId = activeClanId;
     const validClan = clans.find((clan) => clan.id === clanId);
     if (!validClan || !isUuid(clanId)) {
-      if (isSupabaseEnabled && supabase) {
-        const { data: clanRows } = await supabase.from("clans").select("id").limit(1);
-        clanId = clanRows?.[0]?.id ?? "";
+      if (isFirebaseEnabled) {
+        clanId = await firestoreApi.getFirstClanId();
         if (clanId) {
           setActiveClanId(clanId);
         }
       }
     }
-    if (isSupabaseEnabled && (!clanId || !isUuid(clanId))) {
+    if (isFirebaseEnabled && (!clanId || !isUuid(clanId))) {
       return { error: "No valid clan selected for import." };
     }
 
@@ -1282,14 +1163,13 @@ export const useAppData = () => {
       })
       .filter(Boolean) as Relationship[];
 
-    if (!isSupabaseEnabled || !supabase) {
+    if (!isFirebaseEnabled) {
       setPersons((prev) => mergeById(prev, incomingPersons));
       setRelationships((prev) => mergeById(prev, incomingRelationships));
       return { error: "" };
     }
 
-    const { data: sessionData } = await supabase.auth.getSession();
-    const token = sessionData.session?.access_token;
+    const token = await getIdToken();
     if (token) {
       const response = await fetch("/api/admin/import", {
         method: "POST",
@@ -1312,68 +1192,18 @@ export const useAppData = () => {
       return { error: payload.error ?? "Import failed. Check the data format." };
     }
 
-    const { data: insertedPersons } = await supabase
-      .from("persons")
-      .upsert(
-        incomingPersons.map((person) => ({
-          id: person.id,
-          clan_id: clanId,
-          branch_root_id: person.branchRootId ?? null,
-          full_name: person.fullName,
-          birth_date: person.birthDate ?? null,
-          death_date: person.deathDate ?? null,
-          is_alive: person.isAlive,
-          gender: person.gender ?? null,
-          photo_url: person.photoUrl ?? null,
-          notes: person.notes ?? null,
-          stats: person.stats ?? {},
-        })),
-        { onConflict: "id" }
-      )
-      .select();
-
-    const { data: insertedRelationships } = await supabase
-      .from("relationships")
-      .upsert(
-        incomingRelationships.map((rel) => ({
-          id: rel.id,
-          clan_id: clanId,
-          parent_id: rel.parentId,
-          child_id: rel.childId,
-          relationship_type: rel.relationshipType ?? "parent",
-          marriage_date: rel.marriageDate ?? null,
-        })),
-        { onConflict: "id" }
-      )
-      .select();
-
-    if (insertedPersons) {
-      setPersons((prev) => mergeById(prev, insertedPersons.map(mapPersonRow)));
-    }
-
-    if (insertedRelationships) {
-      setRelationships((prev) => mergeById(prev, insertedRelationships.map(mapRelationshipRow)));
-    }
+    await firestoreApi.batchUpsertPersons(clanId, incomingPersons);
+    await firestoreApi.batchUpsertRelationships(clanId, incomingRelationships);
+    setPersons((prev) => mergeById(prev, incomingPersons));
+    setRelationships((prev) => mergeById(prev, incomingRelationships));
     return { error: "" };
   };
 
   const loadClans = useCallback(
     async (preferredMemberships?: Membership[]) => {
-      const client = supabase;
-      if (!isSupabaseEnabled || !client) return;
-      const { data: clanRows, error } = await client
-        .from("clans")
-        .select("id, name, slug, description, is_public");
-      if (error) {
-        return;
-      }
-      if (clanRows && clanRows.length > 0) {
-        const mapped = (clanRows ?? []).map((row: any) => ({
-          id: row.id,
-          name: row.name,
-          slug: row.slug,
-          description: row.description ?? undefined,
-        }));
+      if (!isFirebaseEnabled) return;
+      const mapped = await firestoreApi.fetchAllClans();
+      if (mapped.length > 0) {
         setClans(mapped);
         const storedId = getStoredClanId();
         const membershipList = preferredMemberships ?? membershipsRef.current;
@@ -1382,16 +1212,18 @@ export const useAppData = () => {
         );
       }
     },
-    [isSupabaseEnabled]
+    [isFirebaseEnabled]
   );
 
   useEffect(() => {
-    const client = supabase;
-    if (!isSupabaseEnabled || !client) return;
+    if (!isFirebaseEnabled) return;
+    void completeEmailLinkSignIn();
+  }, [isFirebaseEnabled]);
 
-    const loadSession = async () => {
-      const { data: userData } = await client.auth.getUser();
-      const user = userData.user;
+  useEffect(() => {
+    if (!isFirebaseEnabled) return;
+
+    const loadSession = async (user: import("firebase/auth").User | null) => {
       if (!user) {
         setCurrentUser(guestProfile);
         setIsGuest(true);
@@ -1402,29 +1234,18 @@ export const useAppData = () => {
       }
 
       setCurrentUser({
-        id: user.id,
-        name: user.user_metadata?.full_name ?? user.email?.split("@")[0] ?? "Member",
+        id: user.uid,
+        name: user.displayName ?? user.email?.split("@")[0] ?? "Member",
         email: user.email ?? "",
       });
       setIsGuest(false);
 
       await bootstrapAdmin();
 
-      const fetchMemberships = async () => {
-        const { data: membershipsRows } = await client
-          .from("clan_memberships")
-          .select("clan_id, role")
-          .eq("user_id", user.id);
-        return (membershipsRows ?? []).map((row: any) => ({
-          clanId: row.clan_id,
-          role: row.role,
-        }));
-      };
-
-      let membershipsList = await fetchMemberships();
+      let membershipsList = await firestoreApi.fetchMembershipsForUser(user.uid);
       if (membershipsList.length === 0) {
         await bootstrapAdmin();
-        membershipsList = await fetchMemberships();
+        membershipsList = await firestoreApi.fetchMembershipsForUser(user.uid);
       }
       setMemberships(membershipsList);
       if (membershipsList.length > 0) {
@@ -1433,80 +1254,40 @@ export const useAppData = () => {
         );
       }
       await loadClans(membershipsList);
-
-      const { data: ownersRows } = await client
-        .from("branch_owners")
-        .select("clan_id, branch_root_id")
-        .eq("user_id", user.id);
-      setBranchOwners(
-        (ownersRows ?? []).map((row: any) => ({
-          clanId: row.clan_id,
-          branchRootId: row.branch_root_id,
-        }))
-      );
+      setBranchOwners(await firestoreApi.fetchBranchOwnersForUser(user.uid));
     };
 
-    loadSession();
-
-    const { data: listener } = client.auth.onAuthStateChange(() => {
-      loadSession();
+    const unsubscribe = subscribeAuth((user) => {
+      void loadSession(user);
     });
 
-    return () => {
-      listener.subscription.unsubscribe();
-    };
-  }, [bootstrapAdmin, isSupabaseEnabled, loadClans]);
+    return () => unsubscribe?.();
+  }, [bootstrapAdmin, isFirebaseEnabled, loadClans]);
 
   useEffect(() => {
-    if (!isSupabaseEnabled) return;
+    if (!isFirebaseEnabled) return;
     if (isUuid(activeClanId)) return;
     const membershipClanId = memberships[0]?.clanId;
     if (membershipClanId && isUuid(membershipClanId)) {
       setActiveClanId(membershipClanId);
     }
-  }, [isSupabaseEnabled, memberships, activeClanId]);
+  }, [isFirebaseEnabled, memberships, activeClanId]);
 
   useEffect(() => {
-    const client = supabase;
-    if (!isSupabaseEnabled || !client || !activeClanId) return;
+    if (!isFirebaseEnabled || !activeClanId) return;
     if (!isUuid(activeClanId)) return;
 
     const loadClanData = async () => {
-      const [
-        { data: personRows, error: personError },
-        { data: relationshipRows, error: relationshipError },
-        { data: positionRows, error: positionError },
-      ] = await Promise.all([
-        client.from("persons").select("*").eq("clan_id", activeClanId),
-        client.from("relationships").select("*").eq("clan_id", activeClanId),
-        client.from("person_positions").select("*").eq("clan_id", activeClanId),
-      ]);
-
-      if (personError || relationshipError || positionError) {
-        return;
-      }
-
-      setPersons((personRows ?? []).map(mapPersonRow));
-      setRelationships((relationshipRows ?? []).map(mapRelationshipRow));
-      setPositions((positionRows ?? []).map(mapPositionRow));
-
-      if (!isGuest) {
-        const { data: eventRows, error: eventError } = await client
-          .from("change_events")
-          .select("*")
-          .eq("clan_id", activeClanId)
-          .order("created_at", { ascending: false });
-        if (!eventError) {
-          setChangeEvents((eventRows ?? []).map(mapChangeEventRow));
-        }
-      } else {
-        setChangeEvents([]);
-      }
+      const bundle = await firestoreApi.fetchClanBundle(activeClanId, !isGuest);
+      setPersons(bundle.persons);
+      setRelationships(bundle.relationships);
+      setPositions(bundle.positions);
+      setChangeEvents(bundle.changeEvents);
     };
 
-    loadClanData();
+    void loadClanData();
     setManualPositions({});
-  }, [activeClanId, isGuest, isSupabaseEnabled]);
+  }, [activeClanId, isGuest, isFirebaseEnabled]);
 
   useEffect(() => {
     if (activeClanId) {
@@ -1525,7 +1306,7 @@ export const useAppData = () => {
     memberships,
     currentUser,
     isGuest,
-    isSupabaseEnabled,
+    isFirebaseEnabled,
     activeClanId,
     setActiveClanId,
     clanPersons,

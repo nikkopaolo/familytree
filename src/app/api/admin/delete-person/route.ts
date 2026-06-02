@@ -1,83 +1,48 @@
 import { NextResponse } from "next/server";
-import { createClient } from "@supabase/supabase-js";
-
-const getSuperAdminEmails = () => {
-  const fallback = "katigbaknikkopaolo@gmail.com";
-  const raw = process.env.SUPER_ADMIN_EMAILS ?? fallback;
-  return new Set(
-    raw
-      .split(",")
-      .map((email) => email.trim().toLowerCase())
-      .filter(Boolean)
-  );
-};
+import { getAdminDb, verifyBearerToken } from "@/lib/firebase/admin";
+import { assertClanAdmin, getBearerToken } from "@/lib/firebase/apiAuth";
 
 export async function POST(request: Request) {
-  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL ?? "";
-  const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY ?? "";
-  if (!supabaseUrl || !serviceRoleKey) {
-    return NextResponse.json({ error: "Supabase service role not configured." }, { status: 500 });
-  }
+  try {
+    const token = getBearerToken(request);
+    if (!token) {
+      return NextResponse.json({ error: "Missing access token." }, { status: 401 });
+    }
 
-  const authHeader = request.headers.get("authorization") ?? "";
-  const token = authHeader.startsWith("Bearer ") ? authHeader.slice(7) : "";
-  if (!token) {
-    return NextResponse.json({ error: "Missing access token." }, { status: 401 });
-  }
+    const decoded = await verifyBearerToken(token);
+    const email = decoded.email ?? "";
+    if (!email) {
+      return NextResponse.json({ error: "Invalid user." }, { status: 401 });
+    }
 
-  const adminClient = createClient(supabaseUrl, serviceRoleKey, {
-    auth: { autoRefreshToken: false, persistSession: false },
-  });
+    const body = await request.json().catch(() => ({}));
+    const clanId = String(body?.clanId ?? "").trim();
+    const personId = String(body?.personId ?? "").trim();
+    if (!clanId || !personId) {
+      return NextResponse.json({ error: "Missing clan id or person id." }, { status: 400 });
+    }
 
-  const { data: userData, error: userError } = await adminClient.auth.getUser(token);
-  const user = userData?.user;
-  if (userError || !user?.email) {
-    return NextResponse.json({ error: "Invalid user." }, { status: 401 });
-  }
-
-  const body = await request.json().catch(() => ({}));
-  const clanId = String(body?.clanId ?? "").trim();
-  const personId = String(body?.personId ?? "").trim();
-  if (!clanId || !personId) {
-    return NextResponse.json({ error: "Missing clan id or person id." }, { status: 400 });
-  }
-
-  const superAdmins = getSuperAdminEmails();
-  const isSuperAdmin = superAdmins.has(user.email.toLowerCase());
-  if (!isSuperAdmin) {
-    const { data: membership } = await adminClient
-      .from("clan_memberships")
-      .select("role")
-      .eq("clan_id", clanId)
-      .eq("user_id", user.id)
-      .maybeSingle();
-    if (!membership || membership.role !== "admin") {
+    const db = getAdminDb();
+    const allowed = await assertClanAdmin(db, decoded.uid, email, clanId);
+    if (!allowed) {
       return NextResponse.json({ error: "Not authorized." }, { status: 403 });
     }
-  }
 
-  const relationshipResult = await adminClient
-    .from("relationships")
-    .delete()
-    .eq("clan_id", clanId)
-    .or(`parent_id.eq.${personId},child_id.eq.${personId}`);
-  if (relationshipResult.error) {
-    return NextResponse.json({ error: relationshipResult.error.message }, { status: 400 });
-  }
+    const relSnap = await db.collection("clans").doc(clanId).collection("relationships").get();
+    const batch = db.batch();
+    relSnap.docs.forEach((docSnap) => {
+      const data = docSnap.data();
+      if (data.parentId === personId || data.childId === personId) {
+        batch.delete(docSnap.ref);
+      }
+    });
+    batch.delete(db.collection("clans").doc(clanId).collection("positions").doc(personId));
+    batch.delete(db.collection("clans").doc(clanId).collection("persons").doc(personId));
+    await batch.commit();
 
-  const positionResult = await adminClient
-    .from("person_positions")
-    .delete()
-    .eq("clan_id", clanId)
-    .eq("person_id", personId);
-  if (positionResult.error) {
-    return NextResponse.json({ error: positionResult.error.message }, { status: 400 });
+    return NextResponse.json({ ok: true });
+  } catch (error) {
+    const message = error instanceof Error ? error.message : "Delete failed.";
+    return NextResponse.json({ error: message }, { status: 500 });
   }
-
-  const personResult = await adminClient.from("persons").delete().eq("id", personId);
-  if (personResult.error) {
-    return NextResponse.json({ error: personResult.error.message }, { status: 400 });
-  }
-
-  return NextResponse.json({ ok: true });
 }

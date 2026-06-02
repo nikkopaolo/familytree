@@ -27,9 +27,17 @@ yarn-error.log*
 
 # local env files
 .env*.local
+firebase-service-account.json
+*-service-account*.json
+scripts/backups/*.backup
+scripts/migrate/output/
 
 # vercel
 .vercel
+
+# firebase
+firebase-debug.log
+.firebase/
 
 # typescript
 *.tsbuildinfo

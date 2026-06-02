@@ -21,7 +21,7 @@ export default function Home() {
     clans,
     currentUser,
     isGuest,
-    isSupabaseEnabled,
+    isFirebaseEnabled,
     activeClanId,
     setActiveClanId,
     clanPersons,
@@ -320,7 +320,7 @@ export default function Home() {
             }}
           />
           <AuthPanel
-            isSupabaseEnabled={isSupabaseEnabled}
+            isFirebaseEnabled={isFirebaseEnabled}
             isGuest={isGuest}
             currentUser={currentUser}
             role={membership?.role}
@@ -345,7 +345,7 @@ export default function Home() {
                 onDeleteRelationship={deleteRelationship}
                 onDelete={deletePerson}
                 canUploadPhoto={Boolean(
-                  selectedPerson && canEditPerson(selectedPerson) && isSupabaseEnabled && !isGuest
+                  selectedPerson && canEditPerson(selectedPerson) && isFirebaseEnabled && !isGuest
                 )}
               onUploadPhoto={
                 selectedPerson
@@ -374,7 +374,7 @@ export default function Home() {
               onDeleteRelationship={deleteRelationship}
               onDelete={deletePerson}
               canUploadPhoto={Boolean(
-                selectedPerson && canEditPerson(selectedPerson) && isSupabaseEnabled && !isGuest
+                selectedPerson && canEditPerson(selectedPerson) && isFirebaseEnabled && !isGuest
               )}
             onUploadPhoto={
               selectedPerson

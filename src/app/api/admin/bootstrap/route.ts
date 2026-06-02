@@ -1,84 +1,65 @@
 import { NextResponse } from "next/server";
-import { createClient } from "@supabase/supabase-js";
-
-const getSuperAdminEmails = () => {
-  const fallback = "katigbaknikkopaolo@gmail.com";
-  const raw = process.env.SUPER_ADMIN_EMAILS ?? fallback;
-  return new Set(
-    raw
-      .split(",")
-      .map((email) => email.trim().toLowerCase())
-      .filter(Boolean)
-  );
-};
+import { FieldValue } from "firebase-admin/firestore";
+import { getAdminDb, verifyBearerToken } from "@/lib/firebase/admin";
+import { getBearerToken, getSuperAdminEmails } from "@/lib/firebase/apiAuth";
 
 export async function POST(request: Request) {
-  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL ?? "";
-  const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY ?? "";
-  if (!supabaseUrl || !serviceRoleKey) {
-    return NextResponse.json({ error: "Supabase service role not configured." }, { status: 500 });
-  }
-
-  const authHeader = request.headers.get("authorization") ?? "";
-  const token = authHeader.startsWith("Bearer ") ? authHeader.slice(7) : "";
-  if (!token) {
-    return NextResponse.json({ error: "Missing access token." }, { status: 401 });
-  }
-
-  const adminClient = createClient(supabaseUrl, serviceRoleKey, {
-    auth: { autoRefreshToken: false, persistSession: false },
-  });
-
-  const { data: userData, error: userError } = await adminClient.auth.getUser(token);
-  const user = userData?.user;
-  if (userError || !user?.email) {
-    return NextResponse.json({ error: "Invalid user." }, { status: 401 });
-  }
-
-  const superAdmins = getSuperAdminEmails();
-  if (!superAdmins.has(user.email.toLowerCase())) {
-    return NextResponse.json({ ok: true, promoted: false });
-  }
-
-  let { data: clans } = await adminClient.from("clans").select("id");
-  if (!clans || clans.length === 0) {
-    const baseSlug = "my-family";
-    const insertClan = async (slug: string) =>
-      adminClient
-        .from("clans")
-        .insert({
-          name: "My Family",
-          slug,
-          description: "Primary clan",
-          created_by: user.id,
-          is_public: true,
-        })
-        .select("id")
-        .single();
-
-    const { data: created, error } = await insertClan(baseSlug);
-    if (!created && error) {
-      const suffix = Date.now().toString(36);
-      await insertClan(`${baseSlug}-${suffix}`);
+  try {
+    const token = getBearerToken(request);
+    if (!token) {
+      return NextResponse.json({ error: "Missing access token." }, { status: 401 });
     }
 
-    const refreshed = await adminClient.from("clans").select("id");
-    clans = refreshed.data ?? [];
+    const decoded = await verifyBearerToken(token);
+    const email = decoded.email?.toLowerCase();
+    if (!email) {
+      return NextResponse.json({ error: "Invalid user." }, { status: 401 });
+    }
+
+    const superAdmins = getSuperAdminEmails();
+    if (!superAdmins.has(email)) {
+      return NextResponse.json({ ok: true, promoted: false });
+    }
+
+    const db = getAdminDb();
+    let clansSnap = await db.collection("clans").get();
+
+    if (clansSnap.empty) {
+      const clanRef = db.collection("clans").doc();
+      await clanRef.set({
+        name: "My Family",
+        slug: "my-family",
+        description: "Primary clan",
+        isPublic: true,
+        createdBy: decoded.uid,
+        createdAt: FieldValue.serverTimestamp(),
+      });
+      clansSnap = await db.collection("clans").get();
+    }
+
+    if (clansSnap.empty) {
+      return NextResponse.json({ ok: true, promoted: false, reason: "no_clans" });
+    }
+
+    const batch = db.batch();
+    clansSnap.docs.forEach((clanDoc) => {
+      const membershipRef = db.collection("memberships").doc(`${decoded.uid}_${clanDoc.id}`);
+      batch.set(
+        membershipRef,
+        {
+          userId: decoded.uid,
+          clanId: clanDoc.id,
+          role: "admin",
+          createdAt: FieldValue.serverTimestamp(),
+        },
+        { merge: true }
+      );
+    });
+    await batch.commit();
+
+    return NextResponse.json({ ok: true, promoted: true, clans: clansSnap.size });
+  } catch (error) {
+    const message = error instanceof Error ? error.message : "Bootstrap failed.";
+    return NextResponse.json({ error: message }, { status: 500 });
   }
-
-  if (!clans || clans.length === 0) {
-    return NextResponse.json({ ok: true, promoted: false, reason: "no_clans" });
-  }
-
-  const rows = clans.map((clan) => ({
-    clan_id: clan.id,
-    user_id: user.id,
-    role: "admin",
-  }));
-
-  await adminClient.from("clan_memberships").upsert(rows, {
-    onConflict: "clan_id,user_id",
-  });
-
-  return NextResponse.json({ ok: true, promoted: true, clans: clans.length });
 }
