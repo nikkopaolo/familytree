@@ -34,7 +34,9 @@ export const getAdminAuth = () => {
 };
 
 export const verifyBearerToken = async (token: string) => {
-  if (!token) return null;
+  if (!token) {
+    throw new Error("Missing access token.");
+  }
   const auth = getAdminAuth();
   return auth.verifyIdToken(token);
 };

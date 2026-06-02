@@ -2,6 +2,29 @@ import { NextResponse } from "next/server";
 import { getAdminDb, verifyBearerToken } from "@/lib/firebase/admin";
 import { assertClanAdmin, getBearerToken } from "@/lib/firebase/apiAuth";
 
+type PersonImportRow = {
+  id: string;
+  clanId: string;
+  branchRootId: string;
+  fullName: string;
+  birthDate: string | null;
+  deathDate: string | null;
+  isAlive: boolean;
+  gender: unknown;
+  photoUrl: unknown;
+  notes: unknown;
+  stats: Record<string, unknown>;
+};
+
+type RelationshipImportRow = {
+  id: string;
+  clanId: string;
+  parentId: string;
+  childId: string;
+  relationshipType: unknown;
+  marriageDate: string | null;
+};
+
 const chunk = <T,>(items: T[], size: number) => {
   const batches: T[][] = [];
   for (let i = 0; i < items.length; i += size) {
@@ -62,7 +85,7 @@ export async function POST(request: Request) {
     const relationships = Array.isArray(body?.relationships) ? body.relationships : [];
     const idMap = new Map<string, string>();
 
-    const personRows = persons.map((person: Record<string, unknown>) => {
+    const personRows: PersonImportRow[] = persons.map((person: Record<string, unknown>) => {
       const rawId = String(person.id ?? "");
       const id = rawId && isUuid(rawId) ? rawId : crypto.randomUUID();
       if (rawId && rawId !== id) {
@@ -117,7 +140,7 @@ export async function POST(request: Request) {
           marriageDate,
         };
       })
-      .filter(Boolean) as Array<Record<string, unknown>>;
+      .filter(Boolean) as RelationshipImportRow[];
 
     for (const batch of chunk(personRows, 200)) {
       const writeBatch = db.batch();
