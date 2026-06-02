@@ -34,7 +34,7 @@ const clanEventsRef = (clanId: string) => collection(getFirebaseDb()!, "clans", 
 export const fetchAllClans = async (): Promise<Clan[]> => {
   const db = getFirebaseDb();
   if (!db) return [];
-  const snap = await getDocs(collection(db, "clans"));
+  const snap = await getDocs(query(collection(db, "clans"), where("isPublic", "==", true)));
   return snap.docs.map((d) => mapClanDoc(d.id, d.data() as Record<string, unknown>));
 };
 
