@@ -38,6 +38,30 @@ export const fetchAllClans = async (): Promise<Clan[]> => {
   return snap.docs.map((d) => mapClanDoc(d.id, d.data() as Record<string, unknown>));
 };
 
+export const fetchVisibleClans = async (memberships: Membership[] = []): Promise<Clan[]> => {
+  const db = getFirebaseDb();
+  if (!db) return [];
+
+  const publicSnap = await getDocs(
+    query(collection(db, "clans"), where("isPublic", "==", true))
+  );
+  const clans = new Map<string, Clan>();
+  publicSnap.docs.forEach((d) => {
+    clans.set(d.id, mapClanDoc(d.id, d.data() as Record<string, unknown>));
+  });
+
+  await Promise.all(
+    memberships.map(async (membership) => {
+      const snap = await getDoc(doc(db, "clans", membership.clanId));
+      if (snap.exists()) {
+        clans.set(snap.id, mapClanDoc(snap.id, snap.data() as Record<string, unknown>));
+      }
+    })
+  );
+
+  return Array.from(clans.values());
+};
+
 export const fetchMembershipsForUser = async (userId: string): Promise<Membership[]> => {
   const db = getFirebaseDb();
   if (!db) return [];
@@ -73,10 +97,17 @@ export const fetchClanBundle = async (clanId: string, includeEvents: boolean) =>
 
   let changeEvents: ChangeEvent[] = [];
   if (includeEvents) {
-    const eventSnap = await getDocs(query(clanEventsRef(clanId), orderBy("createdAt", "desc")));
-    changeEvents = eventSnap.docs.map((d) =>
-      mapChangeEventDoc(d.id, { ...d.data(), clanId } as Record<string, unknown>)
-    );
+    try {
+      const eventSnap = await getDocs(query(clanEventsRef(clanId), orderBy("createdAt", "desc")));
+      changeEvents = eventSnap.docs.map((d) =>
+        mapChangeEventDoc(d.id, { ...d.data(), clanId } as Record<string, unknown>)
+      );
+    } catch (err) {
+      const code = typeof err === "object" && err ? (err as { code?: string }).code : "";
+      if (code !== "permission-denied") {
+        throw err;
+      }
+    }
   }
 
   return { persons, relationships, positions, changeEvents };
